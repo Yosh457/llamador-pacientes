@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Panel de Llamados - {{ establecimiento.nombre }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto my-10 px-4 sm:px-6 lg:px-8">
+    
+    <div class="mb-8 flex items-center justify-between border-b pb-4 border-gray-200">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Llamador de Pacientes</h1>
+            <p class="text-sm font-medium text-blue-600 mt-1">Establecimiento actual: {{ establecimiento.nombre }}</p>
+        </div>
+        <div class="text-right">
+            <p class="text-sm text-gray-500">Operador: <span class="font-semibold text-gray-700">{{ current_user.nombre_completo }}</span></p>
+            <p id="reloj-local" class="text-xs text-gray-400 font-mono mt-1"></p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {# --- COLUMNA PRINCIPAL (OPERACIÓN) --- #}
+        <div class="lg:col-span-2">
+            
+            {% if llamado_actual %}
+            {# --- ESTADO: LLAMADO EN CURSO --- #}
+            <div class="bg-white rounded-xl shadow-lg border border-blue-100 overflow-hidden">
+                <div class="bg-blue-600 p-4 flex justify-between items-center text-white">
+                    <h2 class="font-bold text-lg flex items-center gap-2">
+                        <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        Llamado Activo
+                    </h2>
+                    <span class="text-xs bg-white text-blue-800 font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                        {{ llamado_actual.tipo_llamado_actual }} Llamado
+                    </span>
+                </div>
+                
+                <div class="p-6">
+                    <div class="mb-6 pb-6 border-b border-gray-100">
+                        <p class="text-sm text-gray-500 uppercase font-semibold tracking-wider mb-2">Box de Atención</p>
+                        <p class="text-xl font-bold text-gray-800">{{ llamado_actual.box.nombre }}</p>
+                    </div>
+                    
+                    <div class="mb-8">
+                        <p class="text-sm text-gray-500 uppercase font-semibold tracking-wider mb-3">Paciente(s) Llamado(s)</p>
+                        <ul class="space-y-2">
+                            {% for paciente in llamado_actual.pacientes %}
+                            <li class="flex items-center gap-3 text-lg font-medium text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <span class="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">{{ loop.index }}</span>
+                                {{ paciente.paciente_nombre }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    {# Botones de Acción (Transiciones) #}
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <form action="{{ url_for('llamados.transicion_llamado', llamado_id=llamado_actual.id, accion='segundo') }}" method="POST" class="w-full">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="w-full h-full py-3 px-2 rounded-lg font-bold text-sm transition-all text-white
+                                {% if llamado_actual.tipo_llamado_actual == 'PRIMER' %} bg-yellow-500 hover:bg-yellow-600 shadow-md
+                                {% else %} bg-gray-300 cursor-not-allowed opacity-50 {% endif %}"
+                                {% if llamado_actual.tipo_llamado_actual != 'PRIMER' %}disabled{% endif %}>
+                                2do Llamado
+                            </button>
+                        </form>
+                        
+                        <form action="{{ url_for('llamados.transicion_llamado', llamado_id=llamado_actual.id, accion='tercer') }}" method="POST" class="w-full">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="w-full h-full py-3 px-2 rounded-lg font-bold text-sm transition-all text-white
+                                {% if llamado_actual.tipo_llamado_actual in ['PRIMER', 'SEGUNDO'] %} bg-red-500 hover:bg-red-600 shadow-md
+                                {% else %} bg-gray-300 cursor-not-allowed opacity-50 {% endif %}"
+                                {% if llamado_actual.tipo_llamado_actual not in ['PRIMER', 'SEGUNDO'] %}disabled{% endif %}>
+                                3er Llamado
+                            </button>
+                        </form>
+                        
+                        <form action="{{ url_for('llamados.transicion_llamado', llamado_id=llamado_actual.id, accion='cerrar') }}" method="POST" class="w-full col-span-2 sm:col-span-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="button" data-action="cerrar" class="btn-confirm-action w-full h-full py-3 px-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-sm shadow-md transition-all">
+                                Atendido (Cerrar)
+                            </button>
+                        </form>
+
+                        <form action="{{ url_for('llamados.transicion_llamado', llamado_id=llamado_actual.id, accion='cancelar') }}" method="POST" class="w-full col-span-2 sm:col-span-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="button" data-action="cancelar" class="btn-confirm-action w-full h-full py-3 px-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-bold text-sm shadow-md transition-all">
+                                No se presentó
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            {# --- ESTADO: NUEVO LLAMADO --- #}
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h2 class="text-xl font-bold text-gray-800 mb-6">Realizar Nuevo Llamado</h2>
+                
+                <form action="{{ url_for('llamados.crear_llamado') }}" method="POST" class="space-y-6" id="form-nuevo-llamado">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div>
+                        <label for="box_id" class="block text-sm font-bold text-gray-700 mb-2">Box de Atención</label>
+                        <select id="box_id" name="box_id" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 font-medium bg-gray-50" required>
+                            <option value="" disabled selected>-- Seleccione su Box --</option>
+                            {% for box in boxes %}
+                                <option value="{{ box.id }}">{{ box.nombre }}</option>
+                            {% else %}
+                                <option value="" disabled>No hay boxes configurados en este establecimiento</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="pacientes" class="block text-sm font-bold text-gray-700 mb-2 flex justify-between">
+                            <span>Nombre(s) del Paciente</span>
+                            <span class="font-normal text-gray-400 text-xs">Uno por línea</span>
+                        </label>
+                        <textarea id="pacientes" name="pacientes" rows="5" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 resize-none font-medium bg-gray-50" placeholder="Ej: Juan Pérez&#10;Ana Gómez" required></textarea>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-100">
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-4 rounded-xl shadow-lg transform hover:-translate-y-1 transition duration-200 flex items-center justify-center gap-2 text-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+                            Iniciar Primer Llamado
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
+        {# --- COLUMNA SECUNDARIA (HISTORIAL RÁPIDO) --- #}
+        <div class="lg:col-span-1">
+            <div class="bg-gray-50 rounded-xl border border-gray-200 h-full p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold text-gray-800">Tus Últimos Llamados</h3>
+                    <a href="{{ url_for('llamados.historial') }}" class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline">Ver Historial</a>
+                </div>
+                
+                {% if ultimos_llamados %}
+                <div class="space-y-4">
+                    {% for hist in ultimos_llamados %}
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
+                        {# Borde de color según estado #}
+                        <div class="absolute left-0 top-0 bottom-0 w-1 
+                            {% if hist.estado == 'FINALIZADO' %} bg-green-500 
+                            {% elif hist.estado == 'CANCELADO' %} bg-gray-500 
+                            {% elif hist.estado == 'EXPIRADO' %} bg-red-500 
+                            {% else %} bg-blue-500 {% endif %}">
+                        </div>
+                        
+                        <div class="pl-3">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="text-xs font-bold text-gray-500">{{ hist.fecha_actualizacion.strftime('%H:%M') }}</span>
+                                <span class="text-[10px] font-bold uppercase px-2 py-1 rounded 
+                                    {% if hist.estado == 'FINALIZADO' %} bg-green-100 text-green-800 
+                                    {% elif hist.estado == 'CANCELADO' %} bg-gray-100 text-gray-800 
+                                    {% else %} bg-blue-100 text-blue-800 {% endif %}">
+                                    {{ hist.estado }}
+                                </span>
+                            </div>
+                            <p class="font-semibold text-gray-800 text-sm truncate" title="{{ hist.pacientes|map(attribute='paciente_nombre')|join(', ') }}">
+                                {{ hist.pacientes|map(attribute='paciente_nombre')|join(', ') }}
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">{{ hist.box.nombre }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-10">
+                    <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-500">No hay registros recientes.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# --- MODAL DE CONFIRMACIÓN (REUTILIZADO) --- #}
+<div id="confirmation-modal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 backdrop-blur-sm flex">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 m-4 text-center transform transition-all scale-100">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 mb-4">
+            <svg class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2" id="modal-title">Confirmar Acción</h3>
+        <p class="text-sm text-gray-600 mb-6" id="modal-desc">¿Estás seguro que deseas realizar esta acción?</p>
+        <div class="flex justify-center gap-3">
+            <button id="cancel-action" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-semibold">Cancelar</button>
+            <button id="confirm-action" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">Sí, Confirmar</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/llamados.js') }}"></script>
+{% endblock %}

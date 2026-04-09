@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Boxes{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto my-12 px-4 sm:px-0">
+    
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Configuración de Boxes</h2>
+            <p class="text-gray-500 text-sm">Gestiona las locaciones físicas de cada establecimiento.</p>
+        </div>
+        <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">
+            &larr; Volver al Panel
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {# --- COLUMNA IZQUIERDA: CREAR BOX --- #}
+        <div class="lg:col-span-1">
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Crear Nuevo Box</h3>
+                
+                <form method="POST" action="{{ url_for('admin.boxes') }}" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Establecimiento</label>
+                        <select name="establecimiento_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white" required>
+                            <option value="" disabled {% if not datos_previos %}selected{% endif %}>-- Seleccionar --</option>
+                            {% for est in establecimientos %}
+                                <option value="{{ est.id }}" {% if datos_previos and datos_previos.get('establecimiento_id') == est.id|string %}selected{% endif %}>{{ est.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Nombre del Box / Sala</label>
+                        <input type="text" name="nombre" value="{{ datos_previos.get('nombre') if datos_previos else '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej: Box 1, Sala Estimulación" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Orden de visualización</label>
+                        <input type="number" name="orden" value="{{ datos_previos.get('orden') if datos_previos else '1' }}" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                        <p class="text-xs text-gray-500 mt-1">Determina el orden en la lista del operador.</p>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition">
+                            Guardar Box
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {# --- COLUMNA DERECHA: LISTADO DE BOXES --- #}
+        <div class="lg:col-span-2">
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                
+                {# Filtro rápido #}
+                <form method="GET" action="{{ url_for('admin.boxes') }}" class="mb-6 flex gap-2">
+                    <select name="establecimiento_id" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 text-sm">
+                        <option value="">Ver todos los establecimientos</option>
+                        {% for est in establecimientos %}
+                            <option value="{{ est.id }}" {% if filtro_actual == est.id|string %}selected{% endif %}>
+                                {{ est.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold transition">Filtrar</button>
+                </form>
+
+                {# Tabla #}
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-100 border-b border-gray-200">
+                            <tr>
+                                <th class="text-left py-3 px-4 font-bold text-xs text-gray-500 uppercase">Establecimiento</th>
+                                <th class="text-left py-3 px-4 font-bold text-xs text-gray-500 uppercase">Nombre del Box</th>
+                                <th class="text-center py-3 px-4 font-bold text-xs text-gray-500 uppercase">Orden</th>
+                                <th class="text-center py-3 px-4 font-bold text-xs text-gray-500 uppercase">Estado</th>
+                                <th class="text-center py-3 px-4 font-bold text-xs text-gray-500 uppercase">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for box in boxes %}
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="py-3 px-4 text-sm font-medium text-gray-800">{{ box.establecimiento.nombre }}</td>
+                                <td class="py-3 px-4 text-sm text-gray-600">{{ box.nombre }}</td>
+                                <td class="py-3 px-4 text-sm text-gray-600 text-center">{{ box.orden }}</td>
+                                <td class="py-3 px-4 text-center">
+                                    {% if box.activo %}
+                                        <span class="inline-flex px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">Activo</span>
+                                    {% else %}
+                                        <span class="inline-flex px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-4 text-center flex justify-center gap-2">
+                                    <button type="button" 
+                                            class="btn btn-secondary text-xs w-20 flex justify-center items-center edit-box-btn"
+                                            data-id="{{ box.id }}"
+                                            data-establecimiento="{{ box.establecimiento_id }}"
+                                            data-nombre="{{ box.nombre }}"
+                                            data-orden="{{ box.orden }}">
+                                        Editar
+                                    </button>
+                                    <form action="{{ url_for('admin.toggle_box', id=box.id) }}" method="POST" class="inline m-0">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn {% if box.activo %}btn-warning{% else %}btn-primary{% endif %} text-xs w-24 flex justify-center items-center">
+                                            {{ 'Desactivar' if box.activo else 'Activar' }}
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-8 text-gray-500 bg-gray-50">
+                                    No hay boxes registrados con este filtro. Usa el formulario para crear uno.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# --- MODAL DE EDICIÓN --- #}
+<div id="edit-box-modal" class="fixed inset-0 z-50 items-center justify-center hidden bg-black bg-opacity-50 backdrop-blur-sm flex">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 m-4 transform transition-all scale-100">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-gray-800">Editar Box</h3>
+            <button type="button" id="close-edit-modal" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        
+        <form id="edit-box-form" method="POST" action="" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Establecimiento</label>
+                <select name="establecimiento_id" id="edit-establecimiento" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white" required>
+                    {% for est in establecimientos %}
+                        <option value="{{ est.id }}">{{ est.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-1">Nombre del Box / Sala</label>
+                <input type="text" name="nombre" id="edit-nombre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+
+            <div class="mb-2">
+                <label class="block text-sm font-bold text-gray-700 mb-1">Orden de visualización</label>
+                <input type="number" name="orden" id="edit-orden" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button type="button" id="cancel-edit-modal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition text-sm font-semibold">Cancelar</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const editModal = document.getElementById('edit-box-modal');
+    const editForm = document.getElementById('edit-box-form');
+    const editEstablecimiento = document.getElementById('edit-establecimiento');
+    const editNombre = document.getElementById('edit-nombre');
+    const editOrden = document.getElementById('edit-orden');
+
+    // Botones para cerrar el modal
+    const closeBtns = [document.getElementById('close-edit-modal'), document.getElementById('cancel-edit-modal')];
+
+    // Asignar evento click a todos los botones de "Editar"
+    document.querySelectorAll('.edit-box-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Leer datos de los atributos data-* del botón
+            const boxId = this.dataset.id;
+            
+            // Poblar el formulario
+            editEstablecimiento.value = this.dataset.establecimiento;
+            editNombre.value = this.dataset.nombre;
+            editOrden.value = this.dataset.orden;
+
+            // Generar dinámicamente la ruta de acción usando la estructura de tu Blueprint
+            editForm.action = `/admin/editar_box/${boxId}`;
+
+            // Mostrar modal
+            editModal.classList.remove('hidden');
+        });
+    });
+
+    // Eventos para cerrar el modal
+    closeBtns.forEach(btn => {
+        if (btn) {
+            btn.addEventListener('click', () => {
+                editModal.classList.add('hidden');
+            });
+        }
+    });
+
+    // Cerrar modal al hacer click fuera de la ventana
+    editModal.addEventListener('click', (e) => {
+        if (e.target === editModal) {
+            editModal.classList.add('hidden');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Historial de Llamados{% endblock %}
+{% from '_macros.html' import render_pagination %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto my-12 px-4 sm:px-0">
+    
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Historial Operativo</h2>
+            <p class="text-gray-500 text-sm">Consulta de llamados registrados en el sistema.</p>
+        </div>
+        <div class="flex gap-2">
+            {% if current_user.rol.nombre == 'Operador' %}
+            <a href="{{ url_for('llamados.formulario') }}" class="btn btn-secondary">
+                &larr; Volver al Llamador
+            </a>
+            {% else %}
+            <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">
+                &larr; Volver al Panel
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# --- FILTROS --- #}
+    <form method="GET" action="{{ url_for('llamados.historial') }}" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha</label>
+            <input type="date" name="fecha" value="{{ filtros.fecha or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700">
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Box de Atención</label>
+            <select name="box_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm text-gray-700">
+                <option value="">Todos los boxes</option>
+                {% for box in boxes %}
+                    <option value="{{ box.id }}" {% if filtros.box_id == box.id|string %}selected{% endif %}>
+                        {{ box.nombre }} {% if current_user.rol.nombre == 'Admin' %} ({{ box.establecimiento.nombre }}) {% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Estado</label>
+            <select name="estado" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm text-gray-700">
+                <option value="">Todos los estados</option>
+                <option value="ACTIVO" {% if filtros.estado == 'ACTIVO' %}selected{% endif %}>Activo</option>
+                <option value="FINALIZADO" {% if filtros.estado == 'FINALIZADO' %}selected{% endif %}>Finalizado (Atendido)</option>
+                <option value="CANCELADO" {% if filtros.estado == 'CANCELADO' %}selected{% endif %}>Cancelado (No se presentó)</option>
+                <option value="EXPIRADO" {% if filtros.estado == 'EXPIRADO' %}selected{% endif %}>Expirado</option>
+            </select>
+        </div>
+
+        <div class="flex gap-2">
+            <a href="{{ url_for('llamados.historial') }}" class="w-1/3 px-3 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg text-center hover:bg-gray-300 transition text-sm">Limpiar</a>
+            <button type="submit" class="w-2/3 px-3 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition text-sm">Filtrar</button>
+        </div>
+    </form>
+
+    {# --- TABLA DE RESULTADOS --- #}
+    <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="text-left py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Fecha / Hora</th>
+                        {% if current_user.rol.nombre != 'Operador' %}
+                        <th class="text-left py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Operador</th>
+                        {% endif %}
+                        <th class="text-left py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Box</th>
+                        <th class="text-left py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Pacientes</th>
+                        <th class="text-center py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th class="text-center py-4 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for llamado in pagination.items %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="py-4 px-6 text-sm text-gray-700 font-medium">
+                            {{ llamado.fecha_creacion.strftime('%d-%m-%Y %H:%M') }}
+                        </td>
+                        {% if current_user.rol.nombre != 'Operador' %}
+                        <td class="py-4 px-6 text-sm text-gray-800 font-medium">
+                            {{ llamado.usuario_creador.nombre_completo if llamado.usuario_creador else 'No disponible' }}
+                        </td>
+                        {% endif %}
+                        <td class="py-4 px-6 text-sm text-gray-600">
+                            {{ llamado.box.nombre }}
+                        </td>
+                        <td class="py-4 px-6 text-sm text-gray-800 font-medium max-w-xs truncate" title="{{ llamado.pacientes|map(attribute='paciente_nombre')|join(', ') }}">
+                            {{ llamado.pacientes|map(attribute='paciente_nombre')|join(', ') }}
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold 
+                                {% if llamado.estado == 'FINALIZADO' %} bg-green-100 text-green-800
+                                {% elif llamado.estado == 'CANCELADO' %} bg-gray-100 text-gray-800
+                                {% elif llamado.estado == 'EXPIRADO' %} bg-red-100 text-red-800
+                                {% else %} bg-blue-100 text-blue-800 {% endif %}">
+                                {{ llamado.estado }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            <a href="{{ url_for('llamados.detalle', id=llamado.id) }}" class="text-blue-600 hover:text-blue-800 font-medium text-sm transition">Ver Detalle</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-10 text-gray-500">
+                            No se encontraron llamados con los filtros seleccionados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {{ render_pagination(pagination, 'llamados.historial') }}
+    </div>
+</div>
+{% endblock %}

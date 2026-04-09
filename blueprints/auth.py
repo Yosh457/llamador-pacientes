@@ -37,7 +37,7 @@ def obtener_ruta_redireccion(usuario):
 
     if usuario.rol.nombre == 'Operador':
         # El Operador irá al formulario para llamar pacientes (Fase 2)
-        return url_for('auth.login')  # TODO: cambiar por url_for('llamados.formulario')
+        return url_for('llamados.formulario')
     
     return url_for('auth.login')
 

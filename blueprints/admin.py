@@ -302,11 +302,217 @@ def establecimientos():
     lista = Establecimiento.query.order_by(Establecimiento.nombre).all()
     return render_template('admin/establecimientos.html', establecimientos=lista)
 
-@admin_bp.route('/boxes')
+@admin_bp.route('/boxes', methods=['GET', 'POST'])
 def boxes():
-    # TODO: Implementar CRUD completo en el futuro
-    lista = Box.query.order_by(Box.establecimiento_id, Box.orden).all()
-    return render_template('admin/boxes.html', boxes=lista)
+    """CRUD Básico de Boxes para desbloquear la operación del Operador."""
+    establecimientos = Establecimiento.query.filter_by(activo=True).order_by(Establecimiento.nombre).all()
+    
+    if request.method == 'POST':
+        est_id = request.form.get('establecimiento_id', '').strip()
+        nombre = request.form.get('nombre', '').strip()
+        orden_raw = request.form.get('orden', '1').strip()
+        
+        if not est_id or not nombre:
+            flash('El Establecimiento y el Nombre del box son obligatorios.', 'danger')
+            return render_template(
+                'admin/boxes.html',
+                boxes=Box.query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+
+        if not est_id.isdigit():
+            flash('El establecimiento seleccionado no es válido.', 'danger')
+            return render_template(
+                'admin/boxes.html',
+                boxes=Box.query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+
+        orden = int(orden_raw) if orden_raw.isdigit() and int(orden_raw) > 0 else 1
+        est_id_int = int(est_id)
+            
+        # Validar nombre duplicado dentro del mismo establecimiento
+        existe_nombre = Box.query.filter_by(
+            establecimiento_id=est_id_int,
+            nombre=nombre
+        ).first()
+
+        if existe_nombre:
+            flash(f'Ya existe un box llamado "{nombre}" en ese establecimiento.', 'warning')
+            return render_template(
+                'admin/boxes.html',
+                boxes=Box.query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+
+        # Validar orden duplicado dentro del mismo establecimiento
+        existe_orden = Box.query.filter_by(
+            establecimiento_id=est_id_int,
+            orden=orden
+        ).first()
+
+        if existe_orden:
+            flash(f'Ya existe un box con el orden {orden} en ese establecimiento.', 'warning')
+            return render_template(
+                'admin/boxes.html',
+                boxes=Box.query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        try:
+            nuevo_box = Box(
+                establecimiento_id=est_id_int,
+                nombre=nombre,
+                orden=orden,
+                activo=True
+            )
+            db.session.add(nuevo_box)
+            db.session.commit()
+            
+            registrar_log_sistema(
+                "Creación Box", 
+                f"Box '{nombre}' creado para el establecimiento ID {est_id_int}.", 
+                usuario=current_user
+            )
+            flash('Box creado exitosamente.', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            registrar_log_sistema(
+                "Error Creación Box",
+                f"Error al crear box '{nombre}' para establecimiento ID {est_id_int}: {str(e)}",
+                usuario=current_user
+            )
+            flash('Ocurrió un error al crear el box.', 'danger')
+            
+            return render_template(
+                'admin/boxes.html',
+                boxes=Box.query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        return redirect(url_for('admin.boxes'))
+
+    # Lógica GET: Listar y Filtrar
+    est_filtro = request.args.get('establecimiento_id', '').strip()
+    query = Box.query
+    
+    if est_filtro and est_filtro.isdigit():
+        query = query.filter_by(establecimiento_id=int(est_filtro))
+        
+    lista_boxes = query.order_by(Box.establecimiento_id, Box.orden, Box.nombre).all()
+    
+    return render_template(
+        'admin/boxes.html', 
+        boxes=lista_boxes, 
+        establecimientos=establecimientos, 
+        filtro_actual=est_filtro
+    )
+
+@admin_bp.route('/editar_box/<int:id>', methods=['POST'])
+def editar_box(id):
+    """Edita nombre, establecimiento y orden de un box existente."""
+    box = Box.query.get_or_404(id)
+
+    est_id = request.form.get('establecimiento_id', '').strip()
+    nombre = request.form.get('nombre', '').strip()
+    orden_raw = request.form.get('orden', '1').strip()
+
+    if not est_id or not nombre:
+        flash('El Establecimiento y el Nombre del box son obligatorios.', 'danger')
+        return redirect(url_for('admin.boxes'))
+
+    if not est_id.isdigit():
+        flash('El establecimiento seleccionado no es válido.', 'danger')
+        return redirect(url_for('admin.boxes'))
+
+    orden = int(orden_raw) if orden_raw.isdigit() and int(orden_raw) > 0 else 1
+    est_id_int = int(est_id)
+
+    # Validar nombre duplicado, excluyendo el box actual
+    existe_nombre = Box.query.filter(
+        Box.establecimiento_id == est_id_int,
+        Box.nombre == nombre,
+        Box.id != box.id
+    ).first()
+
+    if existe_nombre:
+        flash(f'Ya existe otro box llamado "{nombre}" en ese establecimiento.', 'warning')
+        return redirect(url_for('admin.boxes'))
+
+    # Validar orden duplicado, excluyendo el box actual
+    existe_orden = Box.query.filter(
+        Box.establecimiento_id == est_id_int,
+        Box.orden == orden,
+        Box.id != box.id
+    ).first()
+
+    if existe_orden:
+        flash(f'Ya existe otro box con el orden {orden} en ese establecimiento.', 'warning')
+        return redirect(url_for('admin.boxes'))
+
+    try:
+        box.establecimiento_id = est_id_int
+        box.nombre = nombre
+        box.orden = orden
+
+        db.session.commit()
+
+        registrar_log_sistema(
+            "Edición Box",
+            f"Box ID {box.id} actualizado a '{nombre}' (Establecimiento ID {est_id_int}, Orden {orden}).",
+            usuario=current_user
+        )
+        flash('Box actualizado correctamente.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        registrar_log_sistema(
+            "Error Edición Box",
+            f"Error al editar box ID {box.id}: {str(e)}",
+            usuario=current_user
+        )
+        flash('Ocurrió un error al actualizar el box.', 'danger')
+
+    return redirect(url_for('admin.boxes'))
+
+@admin_bp.route('/toggle_box/<int:id>', methods=['POST'])
+def toggle_box(id):
+    """Activa o desactiva un box rápidamente."""
+    box = Box.query.get_or_404(id)
+
+    try:
+        box.activo = not box.activo
+        db.session.commit()
+
+        estado = "activado" if box.activo else "desactivado"
+        registrar_log_sistema(
+            "Cambio Estado Box",
+            f"El box '{box.nombre}' fue {estado}.",
+            usuario=current_user
+        )
+        flash(f"Box '{box.nombre}' {estado} correctamente.", 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        registrar_log_sistema(
+            "Error Cambio Estado Box",
+            f"Error al cambiar estado del box '{box.nombre}': {str(e)}",
+            usuario=current_user
+        )
+        flash("Ocurrió un error al cambiar el estado del box.", 'danger')
+
+    return redirect(url_for('admin.boxes'))
 
 @admin_bp.route('/pantallas')
 def pantallas():
