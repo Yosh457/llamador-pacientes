@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from sqlalchemy import or_
+import secrets
 
 # Modelos actualizados al diseño v1 del Llamador
 from models import (
@@ -514,8 +515,159 @@ def toggle_box(id):
 
     return redirect(url_for('admin.boxes'))
 
-@admin_bp.route('/pantallas')
+@admin_bp.route('/pantallas', methods=['GET', 'POST'])
 def pantallas():
-    # TODO: Implementar CRUD completo en el futuro
-    lista = Pantalla.query.order_by(Pantalla.establecimiento_id).all()
-    return render_template('admin/pantallas.html', pantallas=lista)
+    """CRUD de Pantallas Públicas (Smart TVs)."""
+    establecimientos = Establecimiento.query.filter_by(activo=True).order_by(Establecimiento.nombre).all()
+    
+    if request.method == 'POST':
+        est_id = request.form.get('establecimiento_id', '').strip()
+        nombre = request.form.get('nombre', '').strip()
+        
+        if not est_id or not nombre:
+            flash('El Establecimiento y el Nombre de la pantalla son obligatorios.', 'danger')
+            return render_template(
+                'admin/pantallas.html',
+                pantallas=Pantalla.query.order_by(Pantalla.establecimiento_id).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+
+        if not est_id.isdigit():
+            flash('El establecimiento seleccionado no es válido.', 'danger')
+            return render_template('admin/pantallas.html', pantallas=Pantalla.query.order_by(Pantalla.establecimiento_id).all(), establecimientos=establecimientos, filtro_actual='', datos_previos=request.form)
+
+        est_id_int = int(est_id)
+            
+        # Validar Regla de Negocio: SOLO 1 pantalla por establecimiento
+        existe_pantalla = Pantalla.query.filter_by(establecimiento_id=est_id_int).first()
+
+        if existe_pantalla:
+            flash('Error: Este establecimiento ya tiene una pantalla asignada. Solo se permite una por recinto.', 'warning')
+            return render_template(
+                'admin/pantallas.html',
+                pantallas=Pantalla.query.order_by(Pantalla.establecimiento_id).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        try:
+            # Generar un token único y seguro de 32 caracteres
+            nuevo_token = secrets.token_urlsafe(32)
+            
+            nueva_pantalla = Pantalla(
+                establecimiento_id=est_id_int,
+                nombre=nombre,
+                token_acceso=nuevo_token,
+                activo=True
+            )
+            db.session.add(nueva_pantalla)
+            db.session.commit()
+            
+            registrar_log_sistema(
+                "Creación Pantalla", 
+                f"Pantalla '{nombre}' creada para establecimiento ID {est_id_int}.", 
+                usuario=current_user
+            )
+            flash('Pantalla creada exitosamente. El token de acceso ha sido generado.', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            registrar_log_sistema("Error Creación Pantalla", f"Error: {str(e)}", usuario=current_user)
+            flash('Ocurrió un error al crear la pantalla.', 'danger')
+            
+            return render_template(
+                'admin/pantallas.html',
+                pantallas=Pantalla.query.order_by(Pantalla.establecimiento_id).all(),
+                establecimientos=establecimientos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        return redirect(url_for('admin.pantallas'))
+
+    # Lógica GET: Listar y Filtrar
+    est_filtro = request.args.get('establecimiento_id', '').strip()
+    query = Pantalla.query
+    
+    if est_filtro and est_filtro.isdigit():
+        query = query.filter_by(establecimiento_id=int(est_filtro))
+        
+    lista_pantallas = query.order_by(Pantalla.establecimiento_id, Pantalla.nombre).all()
+    
+    return render_template(
+        'admin/pantallas.html', 
+        pantallas=lista_pantallas, 
+        establecimientos=establecimientos, 
+        filtro_actual=est_filtro
+    )
+
+@admin_bp.route('/editar_pantalla/<int:id>', methods=['POST'])
+def editar_pantalla(id):
+    """Edita nombre y establecimiento de una pantalla existente."""
+    pantalla = Pantalla.query.get_or_404(id)
+
+    est_id = request.form.get('establecimiento_id', '').strip()
+    nombre = request.form.get('nombre', '').strip()
+
+    if not est_id or not nombre:
+        flash('El Establecimiento y el Nombre son obligatorios.', 'danger')
+        return redirect(url_for('admin.pantallas'))
+
+    if not est_id.isdigit():
+        flash('El establecimiento seleccionado no es válido.', 'danger')
+        return redirect(url_for('admin.pantallas'))
+
+    est_id_int = int(est_id)
+
+    # Validar Regla de Negocio (Excluyendo la pantalla actual)
+    existe_pantalla = Pantalla.query.filter(
+        Pantalla.establecimiento_id == est_id_int,
+        Pantalla.id != pantalla.id
+    ).first()
+
+    if existe_pantalla:
+        flash('Error: Ese establecimiento ya tiene otra pantalla asignada.', 'warning')
+        return redirect(url_for('admin.pantallas'))
+
+    try:
+        pantalla.establecimiento_id = est_id_int
+        pantalla.nombre = nombre
+        # NOTA: No regeneramos el token aquí para no desvincular la TV actual.
+        
+        db.session.commit()
+
+        registrar_log_sistema(
+            "Edición Pantalla",
+            f"Pantalla ID {pantalla.id} actualizada a '{nombre}'.",
+            usuario=current_user
+        )
+        flash('Pantalla actualizada correctamente.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        registrar_log_sistema("Error Edición Pantalla", f"Error: {str(e)}", usuario=current_user)
+        flash('Ocurrió un error al actualizar la pantalla.', 'danger')
+
+    return redirect(url_for('admin.pantallas'))
+
+@admin_bp.route('/toggle_pantalla/<int:id>', methods=['POST'])
+def toggle_pantalla(id):
+    """Activa o desactiva una pantalla rápidamente."""
+    pantalla = Pantalla.query.get_or_404(id)
+
+    try:
+        pantalla.activo = not pantalla.activo
+        db.session.commit()
+
+        estado = "activada" if pantalla.activo else "desactivada"
+        registrar_log_sistema("Cambio Estado Pantalla", f"La pantalla '{pantalla.nombre}' fue {estado}.", usuario=current_user)
+        flash(f"Pantalla '{pantalla.nombre}' {estado} correctamente.", 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash("Ocurrió un error al cambiar el estado.", 'danger')
+
+    return redirect(url_for('admin.pantallas'))

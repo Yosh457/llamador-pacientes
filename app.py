@@ -72,8 +72,8 @@ def create_app():
     from blueprints.llamados import llamados_bp
     app.register_blueprint(llamados_bp)
 
-    # from blueprints.pantallas import pantallas_bp
-    # app.register_blueprint(pantallas_bp)
+    from blueprints.pantallas import pantallas_bp
+    app.register_blueprint(pantallas_bp)
 
     # from blueprints.reportes import reportes_bp
     # app.register_blueprint(reportes_bp)
