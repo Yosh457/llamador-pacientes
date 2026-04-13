@@ -295,13 +295,196 @@ def ver_auditoria():
                            tipos_evento=tipos_evento,
                            filtros={'establecimiento_id': est_filtro, 'tipo_evento': evento_filtro})
 
-# --- GESTIÓN BÁSICA (RUTAS PLACEHOLDER PARA HTMLs A FUTURO) ---
+# --- GESTIÓN DE ESTABLECIMIENTOS ---
 
-@admin_bp.route('/establecimientos')
+@admin_bp.route('/establecimientos', methods=['GET', 'POST'])
 def establecimientos():
-    # TODO: Implementar CRUD completo en el futuro
-    lista = Establecimiento.query.order_by(Establecimiento.nombre).all()
-    return render_template('admin/establecimientos.html', establecimientos=lista)
+    """CRUD de Establecimientos de Salud."""
+    tipos = TipoEstablecimiento.query.order_by(TipoEstablecimiento.nombre).all()
+    
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        codigo = request.form.get('codigo', '').strip()
+        tipo_id = request.form.get('tipo_establecimiento_id', '').strip()
+        direccion = request.form.get('direccion', '').strip()
+        telefono = request.form.get('telefono', '').strip()
+        
+        if not nombre or not tipo_id or not codigo:
+            flash('El Nombre, el Código y el Tipo de establecimiento son obligatorios.', 'danger')
+            return render_template(
+                'admin/establecimientos.html',
+                establecimientos=Establecimiento.query.order_by(Establecimiento.nombre).all(),
+                tipos=tipos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+
+        if not tipo_id.isdigit():
+            flash('El tipo de establecimiento seleccionado no es válido.', 'danger')
+            return render_template('admin/establecimientos.html', establecimientos=Establecimiento.query.order_by(Establecimiento.nombre).all(), tipos=tipos, filtro_actual='', datos_previos=request.form)
+
+        tipo_id_int = int(tipo_id)
+            
+        # Validar nombre duplicado globalmente
+        existe_nombre = Establecimiento.query.filter_by(nombre=nombre).first()
+
+        if existe_nombre:
+            flash(f'Ya existe un establecimiento registrado con el nombre "{nombre}".', 'warning')
+            return render_template(
+                'admin/establecimientos.html',
+                establecimientos=Establecimiento.query.order_by(Establecimiento.nombre).all(),
+                tipos=tipos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        # Validar código duplicado globalmente
+        existe_codigo = Establecimiento.query.filter_by(codigo=codigo).first()
+        
+        if existe_codigo:
+            flash(f'Ya existe un establecimiento registrado con el código "{codigo}".', 'warning')
+            return render_template(
+                'admin/establecimientos.html',
+                establecimientos=Establecimiento.query.order_by(Establecimiento.nombre).all(),
+                tipos=tipos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        try:
+            nuevo_est = Establecimiento(
+                tipo_establecimiento_id=tipo_id_int,
+                nombre=nombre,
+                codigo=codigo,
+                direccion=direccion if direccion else None,
+                telefono=telefono if telefono else None,
+                activo=True
+            )
+            db.session.add(nuevo_est)
+            db.session.commit()
+            
+            registrar_log_sistema(
+                "Creación Establecimiento", 
+                f"Establecimiento '{nombre}' creado exitosamente.", 
+                usuario=current_user
+            )
+            flash('Establecimiento creado exitosamente.', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            registrar_log_sistema("Error Creación Establecimiento", f"Error: {str(e)}", usuario=current_user)
+            flash('Ocurrió un error al crear el establecimiento.', 'danger')
+            
+            return render_template(
+                'admin/establecimientos.html',
+                establecimientos=Establecimiento.query.order_by(Establecimiento.nombre).all(),
+                tipos=tipos,
+                filtro_actual='',
+                datos_previos=request.form
+            )
+            
+        return redirect(url_for('admin.establecimientos'))
+
+    # Lógica GET: Listar y Filtrar
+    tipo_filtro = request.args.get('tipo_establecimiento_id', '').strip()
+    query = Establecimiento.query
+    
+    if tipo_filtro and tipo_filtro.isdigit():
+        query = query.filter_by(tipo_establecimiento_id=int(tipo_filtro))
+        
+    lista_est = query.order_by(Establecimiento.nombre).all()
+    
+    return render_template(
+        'admin/establecimientos.html', 
+        establecimientos=lista_est, 
+        tipos=tipos, 
+        filtro_actual=tipo_filtro
+    )
+
+@admin_bp.route('/editar_establecimiento/<int:id>', methods=['POST'])
+def editar_establecimiento(id):
+    """Edita los datos de un establecimiento existente."""
+    est = Establecimiento.query.get_or_404(id)
+
+    nombre = request.form.get('nombre', '').strip()
+    codigo = request.form.get('codigo', '').strip()
+    tipo_id = request.form.get('tipo_establecimiento_id', '').strip()
+    direccion = request.form.get('direccion', '').strip()
+    telefono = request.form.get('telefono', '').strip()
+
+    if not nombre or not tipo_id or not codigo:
+        flash('El Nombre, el Código y el Tipo son obligatorios.', 'danger')
+        return redirect(url_for('admin.establecimientos'))
+
+    if not tipo_id.isdigit():
+        flash('El tipo seleccionado no es válido.', 'danger')
+        return redirect(url_for('admin.establecimientos'))
+    
+    tipo_id_int = int(tipo_id)
+
+    # Validar nombre duplicado, excluyendo el actual
+    existe_nombre = Establecimiento.query.filter(
+        Establecimiento.nombre == nombre,
+        Establecimiento.id != est.id
+    ).first()
+
+    if existe_nombre:
+        flash(f'Ya existe otro establecimiento llamado "{nombre}".', 'warning')
+        return redirect(url_for('admin.establecimientos'))
+    
+    # Validar código duplicado, excluyendo el actual
+    existe_codigo = Establecimiento.query.filter(
+        Establecimiento.codigo == codigo,
+        Establecimiento.id != est.id
+    ).first()
+
+    if existe_codigo:
+        flash(f'Ya existe otro establecimiento con el código "{codigo}".', 'warning')
+        return redirect(url_for('admin.establecimientos'))
+
+    try:
+        est.nombre = nombre
+        est.codigo = codigo
+        est.tipo_establecimiento_id = tipo_id_int
+        est.direccion = direccion if direccion else None
+        est.telefono = telefono if telefono else None
+        
+        db.session.commit()
+
+        registrar_log_sistema(
+            "Edición Establecimiento",
+            f"Establecimiento ID {est.id} actualizado a '{nombre}'.",
+            usuario=current_user
+        )
+        flash('Establecimiento actualizado correctamente.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        registrar_log_sistema("Error Edición Establecimiento", f"Error: {str(e)}", usuario=current_user)
+        flash('Ocurrió un error al actualizar el establecimiento.', 'danger')
+
+    return redirect(url_for('admin.establecimientos'))
+
+@admin_bp.route('/toggle_establecimiento/<int:id>', methods=['POST'])
+def toggle_establecimiento(id):
+    """Activa o desactiva un establecimiento."""
+    est = Establecimiento.query.get_or_404(id)
+
+    try:
+        est.activo = not est.activo
+        db.session.commit()
+
+        estado = "activado" if est.activo else "desactivado"
+        registrar_log_sistema("Cambio Estado Establecimiento", f"Establecimiento '{est.nombre}' fue {estado}.", usuario=current_user)
+        flash(f"Establecimiento '{est.nombre}' {estado} correctamente.", 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash("Ocurrió un error al cambiar el estado.", 'danger')
+
+    return redirect(url_for('admin.establecimientos'))
+
+# --- GESTIÓN DE BOXES ---
 
 @admin_bp.route('/boxes', methods=['GET', 'POST'])
 def boxes():
@@ -514,6 +697,8 @@ def toggle_box(id):
         flash("Ocurrió un error al cambiar el estado del box.", 'danger')
 
     return redirect(url_for('admin.boxes'))
+
+# --- GESTIÓN DE PANTALLAS ---
 
 @admin_bp.route('/pantallas', methods=['GET', 'POST'])
 def pantallas():
