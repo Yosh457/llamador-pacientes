@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Operativo - Llamador de Pacientes{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="max-w-7xl mx-auto my-12 px-4 sm:px-0">
+    
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Dashboard Operativo</h2>
+            <p class="text-gray-500 text-sm">Métricas de rendimiento y tiempos de espera en tiempo real.</p>
+        </div>
+        <a href="{{ url_for('admin.panel') if current_user.rol.nombre == 'Admin' else url_for('llamados.historial') }}" class="btn btn-secondary">
+            &larr; Volver
+        </a>
+    </div>
+
+    {# --- PANEL DE FILTROS --- #}
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8 flex flex-wrap gap-4 items-end">
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha Desde</label>
+            <input type="date" id="filtro-desde" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha Hasta</label>
+            <input type="date" id="filtro-hasta" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-700">
+        </div>
+
+        {% if current_user.rol.nombre == 'Admin' %}
+        <div class="flex-grow">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Establecimiento</label>
+            <select id="filtro-establecimiento" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm text-gray-700">
+                <option value="">Todos los establecimientos (Global)</option>
+                {% for est in establecimientos %}
+                    <option value="{{ est.id }}">{{ est.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% else %}
+        <input type="hidden" id="filtro-establecimiento" value="{{ current_user.establecimiento_id }}">
+        <div class="flex-grow">
+            <p class="text-xs font-bold text-gray-500 uppercase mb-1">Establecimiento Actual</p>
+            <p class="text-sm font-semibold text-gray-800 py-2">{{ current_user.establecimiento.nombre if current_user.establecimiento else 'Sin Establecimiento' }}</p>
+        </div>
+        {% endif %}
+
+        <div class="flex gap-2">
+            <button id="btn-filtrar" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                <span>Actualizar</span>
+            </button>
+            
+            <button id="btn-exportar" class="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4 icon-normal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <svg class="animate-spin h-4 w-4 hidden icon-loading" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span>Excel</span>
+            </button>
+        </div>
+    </div>
+
+    {# --- INDICADORES (KPIs) --- #}
+    <div id="loader" class="text-center py-12 hidden">
+        <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <p class="mt-2 text-gray-500 font-medium">Calculando datos...</p>
+    </div>
+
+    <div id="dashboard-content">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-blue-500">
+                <p class="text-sm font-bold text-gray-500 uppercase">Total Llamados</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <p class="text-3xl font-black text-gray-800" id="kpi-total">0</p>
+                </div>
+                <p class="text-xs text-gray-400 mt-1" id="kpi-periodo"></p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-green-500">
+                <p class="text-sm font-bold text-gray-500 uppercase">Atendidos</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <p class="text-3xl font-black text-gray-800" id="kpi-atendidos">0</p>
+                    <span class="text-sm font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded" id="kpi-porcentaje-atendidos">0%</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Pacientes que asistieron</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-red-500">
+                <p class="text-sm font-bold text-gray-500 uppercase">Ausentes</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <p class="text-3xl font-black text-gray-800" id="kpi-ausentes">0</p>
+                    <span class="text-sm font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded" id="kpi-porcentaje-ausentes">0%</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Cancelados (Op) o Expirados</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-amber-500">
+                <p class="text-sm font-bold text-gray-500 uppercase">Eficiencia</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <p class="text-3xl font-black text-gray-800" id="kpi-eficiencia">0.0</p>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Re-llamados prom. por paciente</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Análisis de Tiempos Promedio</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-gray-50 rounded-lg p-5 border border-gray-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-700">Tiempo de Espera</span>
+                        <span class="text-2xl font-black text-amber-600" id="kpi-espera">0 min</span>
+                    </div>
+                    <p class="text-xs text-gray-500">Desde que el operador registra al paciente hasta que se realiza el PRIMER llamado.</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-5 border border-gray-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-700">Tiempo de Atención</span>
+                        <span class="text-2xl font-black text-emerald-600" id="kpi-atencion">0 min</span>
+                    </div>
+                    <p class="text-xs text-gray-500">Desde que se realiza el primer llamado hasta que el paciente es ATENDIDO (cierre).</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="text-sm font-bold text-gray-500 uppercase mb-4 text-center">Distribución de Estados</h3>
+                <div class="relative h-64 w-full flex items-center justify-center">
+                    <div id="empty-estados" class="absolute inset-0 flex items-center justify-center bg-white z-10 hidden">
+                        <p class="text-gray-400 font-medium text-sm flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                            Sin datos en el período
+                        </p>
+                    </div>
+                    <canvas id="chartEstados"></canvas>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="text-sm font-bold text-gray-500 uppercase mb-4 text-center">Volumen por Box / Locación</h3>
+                <div class="relative h-64 w-full flex items-center justify-center">
+                    <div id="empty-boxes" class="absolute inset-0 flex items-center justify-center bg-white z-10 hidden">
+                        <p class="text-gray-400 font-medium text-sm flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                            Sin datos en el período
+                        </p>
+                    </div>
+                    <canvas id="chartBoxes"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Elementos del DOM
+    const btnFiltrar = document.getElementById('btn-filtrar');
+    const btnExportar = document.getElementById('btn-exportar');
+    const inputDesde = document.getElementById('filtro-desde');
+    const inputHasta = document.getElementById('filtro-hasta');
+    const selectEstablecimiento = document.getElementById('filtro-establecimiento');
+    
+    const loader = document.getElementById('loader');
+    const content = document.getElementById('dashboard-content');
+
+    // Variables globales para las instancias de Chart.js
+    let chartEstadosInstance = null;
+    let chartBoxesInstance = null;
+
+    // MEJORA 1: Manejo correcto de Zonas Horarias locales
+    function formatDateLocal(date) {
+        const offset = date.getTimezoneOffset();
+        const localDate = new Date(date.getTime() - (offset * 60000));
+        return localDate.toISOString().split('T')[0];
+    }
+
+    // 2. Establecer fechas por defecto (Primer día del mes actual y hoy)
+    const hoy = new Date();
+    const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    
+    // Formatear a YYYY-MM-DD para los inputs date
+    inputHasta.value = formatDateLocal(hoy);
+    inputDesde.value = formatDateLocal(primerDia);
+
+    // 3. Función Principal para obtener datos (AJAX)
+    async function cargarMetricas() {
+        // MEJORA 4: Prevenir múltiples requests (Deshabilitar botón)
+        btnFiltrar.disabled = true;
+        const btnTextSpan = btnFiltrar.querySelector('span');
+        const originalText = btnTextSpan.textContent;
+        btnTextSpan.textContent = "Cargando...";
+
+        // Mostrar Loader
+        loader.classList.remove('hidden');
+        content.classList.add('opacity-50', 'pointer-events-none', 'transition-opacity');
+
+        // Construir URL con parámetros
+        const desde = inputDesde.value;
+        const hasta = inputHasta.value;
+        const estId = selectEstablecimiento ? selectEstablecimiento.value : '';
+
+        let url = `/reportes/api/metricas?desde=${desde}&hasta=${hasta}`;
+        if (estId) url += `&establecimiento_id=${estId}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Error al cargar datos');
+            const data = await response.json();
+            
+            actualizarUI(data);
+
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudieron cargar las métricas. Intente nuevamente.");
+        } finally {
+            // Ocultar Loader y rehabilitar botón
+            loader.classList.add('hidden');
+            content.classList.remove('opacity-50', 'pointer-events-none');
+            btnFiltrar.disabled = false;
+            btnTextSpan.textContent = originalText;
+        }
+    }
+
+    // 4. Actualizar toda la vista con los datos JSON
+    function actualizarUI(data) {
+        const total = data.totales.general;
+        const atendidos = data.totales.por_estado['FINALIZADO'] || 0;
+        
+        // MEJORA 2: Separación lógica, pero agrupados visualmente bajo "Ausentes"
+        const cancelados = data.totales.por_estado['CANCELADO'] || 0;
+        const expirados = data.totales.por_estado['EXPIRADO'] || 0;
+        const ausentes = cancelados + expirados;
+
+        // MEJORA 5: KPIs Porcentuales
+        const pctAtendidos = total > 0 ? ((atendidos / total) * 100).toFixed(1) : 0;
+        const pctAusentes = total > 0 ? ((ausentes / total) * 100).toFixed(1) : 0;
+
+        // Actualizar Textos (KPIs)
+        document.getElementById('kpi-total').textContent = total;
+        document.getElementById('kpi-periodo').textContent = `Del ${formatearFecha(data.periodo.desde)} al ${formatearFecha(data.periodo.hasta)}`;
+        
+        document.getElementById('kpi-atendidos').textContent = atendidos;
+        document.getElementById('kpi-porcentaje-atendidos').textContent = pctAtendidos + '%';
+        
+        document.getElementById('kpi-ausentes').textContent = ausentes;
+        document.getElementById('kpi-porcentaje-ausentes').textContent = pctAusentes + '%';
+        
+        document.getElementById('kpi-eficiencia').textContent = data.eficiencia.promedio_rellamados_por_paciente;
+        document.getElementById('kpi-espera').textContent = data.tiempos_promedio_minutos.espera_creacion_a_primer_llamado + " min";
+        document.getElementById('kpi-atencion').textContent = data.tiempos_promedio_minutos.atencion_primer_llamado_a_cierre + " min";
+
+        // Actualizar Gráficos
+        dibujarGraficoEstados(data.totales.por_estado);
+        dibujarGraficoBoxes(data.totales.por_box);
+    }
+
+    // Funciones Auxiliares para Gráficos
+    function dibujarGraficoEstados(datosEstado) {
+        const ctx = document.getElementById('chartEstados').getContext('2d');
+        const emptyDiv = document.getElementById('empty-estados');
+        
+        // Preparar data
+        const labels = ['Atendidos (Fin)', 'Cancelados (Op)', 'Expirados (No Pres)', 'En Curso (Act)'];
+        const values = [
+            datosEstado['FINALIZADO'] || 0,
+            datosEstado['CANCELADO'] || 0,
+            datosEstado['EXPIRADO'] || 0,
+            datosEstado['ACTIVO'] || 0
+        ];
+        
+        const sum = values.reduce((a, b) => a + b, 0);
+
+        // MEJORA 3: Validar gráfico vacío
+        if (sum === 0) {
+            if (chartEstadosInstance) chartEstadosInstance.destroy();
+            emptyDiv.classList.remove('hidden');
+            return;
+        } else {
+            emptyDiv.classList.add('hidden');
+        }
+
+        if (chartEstadosInstance) chartEstadosInstance.destroy();
+
+        // Colores: Verde, Gris Oscuro, Rojo, Azul
+        const bgColors = ['#10b981', '#475569', '#ef4444', '#3b82f6'];
+
+        chartEstadosInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: bgColors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                cutout: '65%' // Hace la dona más delgada
+            }
+        });
+    }
+
+    function dibujarGraficoBoxes(datosBox) {
+        const ctx = document.getElementById('chartBoxes').getContext('2d');
+        const emptyDiv = document.getElementById('empty-boxes');
+
+        // Ordenar datos de mayor a menor
+        const arrayDatos = Object.keys(datosBox).map(key => ({ nombre: key, total: datosBox[key] }));
+        arrayDatos.sort((a, b) => b.total - a.total);
+
+        const labels = arrayDatos.map(item => item.nombre);
+        const values = arrayDatos.map(item => item.total);
+
+        const sum = values.reduce((a, b) => a + b, 0);
+
+        // MEJORA 3: Validar gráfico vacío
+        if (sum === 0) {
+            if (chartBoxesInstance) chartBoxesInstance.destroy();
+            emptyDiv.classList.remove('hidden');
+            return;
+        } else {
+            emptyDiv.classList.add('hidden');
+        }
+
+        if (chartBoxesInstance) chartBoxesInstance.destroy();
+
+        chartBoxesInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Nº de Llamados',
+                    data: values,
+                    backgroundColor: '#0ea5e9', // Azul corporativo
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false } // Ocultamos leyenda porque es obvia
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } } // Sin decimales en el eje Y
+                }
+            }
+        });
+    }
+
+    // Auxiliar Formato Fecha Visual
+    function formatearFecha(fechaIso) {
+        const partes = fechaIso.split('-'); // YYYY-MM-DD
+        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+
+    // 5. Asignar Eventos
+    btnFiltrar.addEventListener('click', cargarMetricas);
+
+    // NUEVO: Botón de Exportación a Excel con UX mejorada
+    btnExportar.addEventListener('click', () => {
+        const btnTextSpan = btnExportar.querySelector('span');
+        const iconNormal = btnExportar.querySelector('.icon-normal');
+        const iconLoading = btnExportar.querySelector('.icon-loading');
+        const originalText = btnTextSpan.textContent;
+
+        // Feedback visual
+        btnExportar.disabled = true;
+        btnTextSpan.textContent = "Generando...";
+        iconNormal.classList.add('hidden');
+        iconLoading.classList.remove('hidden');
+
+        const desde = inputDesde.value;
+        const hasta = inputHasta.value;
+        const estId = selectEstablecimiento ? selectEstablecimiento.value : '';
+
+        let url = `/reportes/export/excel?desde=${desde}&hasta=${hasta}`;
+        if (estId) url += `&establecimiento_id=${estId}`;
+
+        // Al usar window.location.href, el archivo se descarga pero la página no se recarga.
+        // Simulamos el fin de carga con un pequeño timeout, ya que no hay un callback nativo
+        // para saber cuando una descarga vía href terminó.
+        window.location.href = url;
+
+        setTimeout(() => {
+            btnExportar.disabled = false;
+            btnTextSpan.textContent = originalText;
+            iconNormal.classList.remove('hidden');
+            iconLoading.classList.add('hidden');
+        }, 1500);
+    });
+
+    // Cargar datos iniciales al abrir la página
+    cargarMetricas();
+});
+</script>
+{% endblock %}

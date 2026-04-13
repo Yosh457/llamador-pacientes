@@ -31,12 +31,12 @@ def obtener_ruta_redireccion(usuario):
     if usuario.rol.nombre == 'Admin':
         return url_for('admin.panel')
     
+    # El Supervisor va al dashboard de reportes/estadísticas (Fase 4)
     if usuario.rol.nombre == 'Supervisor':
-        # El Supervisor irá al dashboard de reportes/estadísticas (Fase 4)
-        return url_for('auth.login')  # TODO: cambiar por url_for('reportes.dashboard')
+        return url_for('reportes.dashboard')
 
+    # El Operador va al formulario para llamar pacientes (Fase 2)
     if usuario.rol.nombre == 'Operador':
-        # El Operador irá al formulario para llamar pacientes (Fase 2)
         return url_for('llamados.formulario')
     
     return url_for('auth.login')
