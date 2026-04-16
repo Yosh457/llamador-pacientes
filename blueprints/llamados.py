@@ -25,25 +25,29 @@ def formulario():
     establecimiento = Establecimiento.query.get(establecimiento_id)
     
     # 2. Obtener boxes activos del establecimiento
-    boxes = Box.query.filter_by(establecimiento_id=establecimiento_id, activo=True).order_by(Box.orden).all()
+    boxes = Box.query.filter_by(
+        establecimiento_id=establecimiento_id,
+        activo=True
+    ).order_by(Box.orden).all()
     
-    # 3. Traer el llamado actualmente ACTIVO de este usuario (si tiene alguno)
+    # 3. Traer el llamado actualmente ACTIVO de este usuario
     llamado_actual = Llamado.query.filter_by(
         usuario_creador_id=current_user.id, 
         estado='ACTIVO'
     ).first()
     
-    # 4. Traer los últimos 5 llamados de este operador para el resumen rápido
-    ultimos_llamados = Llamado.query.filter_by(
-        usuario_creador_id=current_user.id
-    ).order_by(Llamado.fecha_creacion.desc()).limit(5).all()
+    # 4. 🔥 NUEVO: Últimos eventos (trazabilidad real del operador)
+    ultimos_eventos = LlamadoEvento.query.filter(
+        LlamadoEvento.usuario_id == current_user.id,
+        LlamadoEvento.tipo_evento != 'CREACION'
+    ).order_by(LlamadoEvento.fecha_evento.desc()).limit(5).all()
     
     return render_template(
         'llamados/formulario.html',
         establecimiento=establecimiento,
         boxes=boxes,
         llamado_actual=llamado_actual,
-        ultimos_llamados=ultimos_llamados
+        ultimos_eventos=ultimos_eventos
     )
 
 # --- RUTAS DE ACCIÓN (ENDPOINTS API/FORMULARIO) ---

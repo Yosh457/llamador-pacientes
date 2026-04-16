@@ -137,32 +137,41 @@
                     <a href="{{ url_for('llamados.historial') }}" class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline">Ver Historial</a>
                 </div>
                 
-                {% if ultimos_llamados %}
+                {% if ultimos_eventos %}
                 <div class="space-y-4">
-                    {% for hist in ultimos_llamados %}
+                    {% for ev in ultimos_eventos %}
                     <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative overflow-hidden">
-                        {# Borde de color según estado #}
+
+                        {# Borde lateral según tipo de evento #}
                         <div class="absolute left-0 top-0 bottom-0 w-1 
-                            {% if hist.estado == 'FINALIZADO' %} bg-green-500 
-                            {% elif hist.estado == 'CANCELADO' %} bg-gray-500 
-                            {% elif hist.estado == 'EXPIRADO' %} bg-red-500 
+                            {% if ev.tipo_evento == 'CIERRE' %} bg-green-500 
+                            {% elif ev.tipo_evento in ['CANCELACION', 'EXPIRACION'] %} bg-gray-500 
                             {% else %} bg-blue-500 {% endif %}">
                         </div>
                         
                         <div class="pl-3">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="text-xs font-bold text-gray-500">{{ hist.fecha_actualizacion.strftime('%H:%M') }}</span>
+                                <span class="text-xs font-bold text-gray-500">
+                                    {{ ev.fecha_evento.strftime('%H:%M') }}
+                                </span>
+
                                 <span class="text-[10px] font-bold uppercase px-2 py-1 rounded 
-                                    {% if hist.estado == 'FINALIZADO' %} bg-green-100 text-green-800 
-                                    {% elif hist.estado == 'CANCELADO' %} bg-gray-100 text-gray-800 
+                                    {% if ev.tipo_evento == 'CIERRE' %} bg-green-100 text-green-800 
+                                    {% elif ev.tipo_evento in ['CANCELACION', 'EXPIRACION'] %} bg-gray-100 text-gray-800 
                                     {% else %} bg-blue-100 text-blue-800 {% endif %}">
-                                    {{ hist.estado }}
+                                    
+                                    {{ ev.tipo_evento.replace('_', ' ') }}
                                 </span>
                             </div>
-                            <p class="font-semibold text-gray-800 text-sm truncate" title="{{ hist.pacientes|map(attribute='paciente_nombre')|join(', ') }}">
-                                {{ hist.pacientes|map(attribute='paciente_nombre')|join(', ') }}
+
+                            {# Snapshot congelado del momento del evento (NO dinámico) #}
+                            <p class="font-semibold text-gray-800 text-sm truncate" title="{{ ev.pacientes_snapshot }}">
+                                {{ ev.pacientes_snapshot }}
                             </p>
-                            <p class="text-xs text-gray-500 mt-1">{{ hist.box.nombre }}</p>
+
+                            <p class="text-xs text-gray-500 mt-1">
+                                {{ ev.box.nombre if ev.box else 'Sin box' }}
+                            </p>
                         </div>
                     </div>
                     {% endfor %}
