@@ -36,7 +36,8 @@ def formulario():
         estado='ACTIVO'
     ).first()
     
-    # 4. 🔥 NUEVO: Últimos eventos (trazabilidad real del operador)
+    # 4. Últimos eventos (trazabilidad real del operador)
+    # Excluimos CREACION para no duplicar visualmente el inicio en el panel lateral
     ultimos_eventos = LlamadoEvento.query.filter(
         LlamadoEvento.usuario_id == current_user.id,
         LlamadoEvento.tipo_evento != 'CREACION'
@@ -65,7 +66,7 @@ def crear_llamado():
         flash("Debes seleccionar un box e ingresar al menos un paciente.", "danger")
         return redirect(url_for('llamados.formulario'))
     
-    # 🔴 MEJORA: Validar que el Box exista, esté activo y pertenezca al establecimiento del operador
+    # Validar que el Box exista, esté activo y pertenezca al establecimiento del operador
     box_seleccionado = Box.query.filter_by(id=int(box_id), establecimiento_id=establecimiento_id, activo=True).first()
     if not box_seleccionado:
         flash("El box seleccionado no es válido o no pertenece a tu establecimiento.", "danger")
@@ -112,10 +113,25 @@ def crear_llamado():
                 orden_visualizacion=idx
             )
             db.session.add(paciente)
-            
-        # 3. Crear Evento de Auditoría (Creación/Primer Llamado)
+        
         snapshot = ", ".join(nombres_pacientes)
-        evento = LlamadoEvento(
+        
+        # 3A. Crear Evento de Auditoría: CREACION (Tiempo T0)
+        evento_creacion = LlamadoEvento(
+            llamado_id=nuevo_llamado.id,
+            establecimiento_id=establecimiento_id,
+            box_id=int(box_id),
+            tipo_evento='CREACION',
+            usuario_id=current_user.id,
+            usuario_nombre=current_user.nombre_completo,
+            fecha_evento=ahora,
+            pacientes_snapshot=snapshot,
+            detalle="Paciente registrado en el sistema."
+        )
+        db.session.add(evento_creacion)
+        
+        # 3B. Crear Evento de Auditoría: PRIMER LLAMADO
+        evento_primer = LlamadoEvento(
             llamado_id=nuevo_llamado.id,
             establecimiento_id=establecimiento_id,
             box_id=int(box_id),
@@ -126,7 +142,7 @@ def crear_llamado():
             pacientes_snapshot=snapshot,
             detalle="Operador inició el primer llamado."
         )
-        db.session.add(evento)
+        db.session.add(evento_primer)
         
         db.session.commit()
         flash("Primer llamado realizado con éxito.", "success")
@@ -161,7 +177,7 @@ def transicion_llamado(llamado_id, accion):
         tipo_evento = None
         detalle_evento = ""
         
-        # 🔴 MEJORA: Secuencia estricta PRIMER -> SEGUNDO -> TERCER
+        # Secuencia estricta PRIMER -> SEGUNDO -> TERCER
         if accion == 'segundo':
             if llamado.tipo_llamado_actual != 'PRIMER':
                 flash("Solo puedes hacer el Segundo Llamado si estás en el Primero.", "warning")
@@ -224,7 +240,7 @@ def transicion_llamado(llamado_id, accion):
         
     return redirect(url_for('llamados.formulario'))
 
-# --- NUEVAS RUTAS: FASE 2B (HISTORIAL Y DETALLE) ---
+# --- RUTAS DE HISTORIAL Y DETALLE ---
 
 @llamados_bp.route('/historial')
 @login_required
@@ -237,7 +253,7 @@ def historial():
     
     query = Llamado.query
     
-    # 🔴 Lógica de Permisos Escalonados
+    # Lógica de Permisos Escalonados
     if current_user.rol.nombre == 'Operador':
         # Operador: Solo ve SUS llamados
         query = query.filter(Llamado.usuario_creador_id == current_user.id)
@@ -281,7 +297,7 @@ def detalle(id):
     """Vista de detalle completo de un llamado y su trazabilidad."""
     llamado = Llamado.query.get_or_404(id)
     
-    # 🔴 Lógica de Permisos Escalonados para ver el detalle
+    # Lógica de Permisos Escalonados para ver el detalle
     if current_user.rol.nombre == 'Operador' and llamado.usuario_creador_id != current_user.id:
         abort(403)
     elif current_user.rol.nombre == 'Supervisor' and llamado.establecimiento_id != current_user.establecimiento_id:
