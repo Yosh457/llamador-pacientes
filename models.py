@@ -37,6 +37,8 @@ class Establecimiento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(150), unique=True, nullable=False)
     codigo = db.Column(db.String(100), unique=True, nullable=False)
+    direccion = db.Column(db.String(255), nullable=True)
+    telefono = db.Column(db.String(50), nullable=True)
     tipo_establecimiento_id = db.Column(db.Integer, db.ForeignKey('tipos_establecimiento.id'), nullable=False, index=True)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_chile, nullable=False)
@@ -167,7 +169,7 @@ class Llamado(db.Model):
     )
 
     estado = db.Column(
-        db.Enum('ACTIVO', 'FINALIZADO', 'CANCELADO', 'EXPIRADO', name='estado_llamado_enum'),
+        db.Enum('ACTIVO', 'FINALIZADO', 'CANCELADO', name='estado_llamado_enum'),
         nullable=False,
         default='ACTIVO'
     )
@@ -175,8 +177,6 @@ class Llamado(db.Model):
     usuario_creador_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_chile, nullable=False)
     fecha_actualizacion = db.Column(db.DateTime, default=obtener_hora_chile, onupdate=obtener_hora_chile, nullable=False)
-    fecha_expiracion = db.Column(db.DateTime, nullable=True)
-    visible_en_pantalla = db.Column(db.Boolean, default=True, nullable=False)
 
     cerrado_por_usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='SET NULL'), nullable=True)
     fecha_cierre = db.Column(db.DateTime, nullable=True)
@@ -197,7 +197,6 @@ class Llamado(db.Model):
         db.Index('idx_llamados_box_fecha', 'box_id', 'fecha_creacion'),
         db.Index('idx_llamados_usuario_fecha', 'usuario_creador_id', 'fecha_creacion'),
         db.Index('idx_llamados_estado_fecha', 'estado', 'fecha_creacion'),
-        db.Index('idx_llamados_fecha_expiracion', 'fecha_expiracion'),
     )
 
 
@@ -242,7 +241,6 @@ class LlamadoEvento(db.Model):
             'TERCER_LLAMADO',
             'CIERRE',
             'CANCELACION',
-            'EXPIRACION',
             name='tipo_evento_llamado_enum'
         ),
         nullable=False
@@ -262,6 +260,7 @@ class LlamadoEvento(db.Model):
     box = db.relationship('Box')
 
     __table_args__ = (
+        db.Index('idx_pantalla_polling_min', 'establecimiento_id', 'id'),
         db.Index('idx_llamado_eventos_llamado_fecha', 'llamado_id', 'fecha_evento'),
         db.Index('idx_llamado_eventos_establecimiento_fecha', 'establecimiento_id', 'fecha_evento'),
         db.Index('idx_llamado_eventos_usuario_fecha', 'usuario_id', 'fecha_evento'),
@@ -282,5 +281,6 @@ class LogSistema(db.Model):
     usuario_nombre = db.Column(db.String(255), nullable=True)
     accion = db.Column(db.String(255), nullable=False)
     detalles = db.Column(db.Text, nullable=True)
+    ip_origen = db.Column(db.String(50), nullable=True)
 
     usuario = db.relationship('Usuario')

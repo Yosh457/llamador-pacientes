@@ -287,7 +287,7 @@ def ver_auditoria():
     pagination = query.paginate(page=page, per_page=15, error_out=False)
     
     establecimientos = Establecimiento.query.order_by(Establecimiento.nombre).all()
-    tipos_evento = ['CREACION', 'PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO', 'CIERRE', 'CANCELACION', 'EXPIRACION']
+    tipos_evento = ['CREACION', 'PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO', 'CIERRE', 'CANCELACION']
 
     return render_template('admin/ver_auditoria.html', 
                            pagination=pagination,

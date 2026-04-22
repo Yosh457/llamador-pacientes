@@ -162,12 +162,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const evento = announcementQueue.shift(); // Extraer el primer evento de la fila
 
+        // 🛡️ DEFENSIVO: Validar que el evento tenga tipo
+        if (!evento.tipo_evento) {
+            console.warn("Evento sin tipo_evento:", evento);
+            isAnnouncing = false;
+            processQueue();
+            return;
+        }
+
         // 🔹 Si el evento es un cierre y corresponde al que está en pantalla, limpiamos la TV.
-        if (['CIERRE', 'CANCELACION', 'EXPIRACION'].includes(evento.tipo_evento)) {
+        if (['CIERRE', 'CANCELACION'].includes(evento.tipo_evento)) {
             if (evento.llamado_id === currentCallIdOnScreen) {
                 showEmptyState();
             }
             // Como es un cierre, no hay voz. Pasamos inmediatamente al siguiente en la cola.
+            isAnnouncing = false;
+            processQueue();
+            return;
+        }
+
+        // 🔹 VALIDACIÓN: Solo permitir eventos válidos de anuncio
+        const eventosAnuncio = ['PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO'];
+
+        if (!eventosAnuncio.includes(evento.tipo_evento)) {
+            console.warn("Evento no reconocido (ignorado):", evento.tipo_evento);
             isAnnouncing = false;
             processQueue();
             return;

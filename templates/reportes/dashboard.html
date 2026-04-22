@@ -88,7 +88,7 @@
                     <p class="text-3xl font-black text-gray-800" id="kpi-ausentes">0</p>
                     <span class="text-sm font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded" id="kpi-porcentaje-ausentes">0%</span>
                 </div>
-                <p class="text-xs text-gray-400 mt-1">Cancelados (Op) o Expirados</p>
+                <p class="text-xs text-gray-400 mt-1">Pacientes que no se presentaron</p>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 border-l-4 border-l-amber-500">
                 <p class="text-sm font-bold text-gray-500 uppercase">Eficiencia</p>
@@ -229,8 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // MEJORA 2: Separación lógica, pero agrupados visualmente bajo "Ausentes"
         const cancelados = data.totales.por_estado['CANCELADO'] || 0;
-        const expirados = data.totales.por_estado['EXPIRADO'] || 0;
-        const ausentes = cancelados + expirados;
+        const ausentes = cancelados;
 
         // MEJORA 5: KPIs Porcentuales
         const pctAtendidos = total > 0 ? ((atendidos / total) * 100).toFixed(1) : 0;
@@ -261,11 +260,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const emptyDiv = document.getElementById('empty-estados');
         
         // Preparar data
-        const labels = ['Atendidos (Fin)', 'Cancelados (Op)', 'Expirados (No Pres)', 'En Curso (Act)'];
+        const labels = [
+            'Atendidos',
+            'Cancelados',
+            'En Curso'
+        ];
         const values = [
             datosEstado['FINALIZADO'] || 0,
             datosEstado['CANCELADO'] || 0,
-            datosEstado['EXPIRADO'] || 0,
             datosEstado['ACTIVO'] || 0
         ];
         
@@ -282,8 +284,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (chartEstadosInstance) chartEstadosInstance.destroy();
 
-        // Colores: Verde, Gris Oscuro, Rojo, Azul
-        const bgColors = ['#10b981', '#475569', '#ef4444', '#3b82f6'];
+        // Colores: Verde, Gris Oscuro, Azul
+        const bgColors = ['#10b981', '#475569', '#3b82f6'];
 
         chartEstadosInstance = new Chart(ctx, {
             type: 'doughnut',

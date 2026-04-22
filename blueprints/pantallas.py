@@ -44,7 +44,7 @@ def api_estado(token):
 
     # 2. Lógica de Sincronización de Cola (Polling con last_id)
     # Incluimos Cierres y Cancelaciones para que el JS sepa cuándo limpiar la pantalla.
-    tipos_validos = ['PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO', 'CIERRE', 'CANCELACION', 'EXPIRACION']
+    tipos_validos = ['PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO', 'CIERRE', 'CANCELACION']
 
     if last_id is None:
         # Carga inicial: No encolar audios viejos, solo establecer el punto de partida
@@ -53,8 +53,7 @@ def api_estado(token):
         # Enviamos el llamado activo actual para evitar que la pantalla quede en blanco al recargar
         llamado_activo = Llamado.query.filter_by(
             establecimiento_id=est_id,
-            estado='ACTIVO',
-            visible_en_pantalla=True
+            estado='ACTIVO'
         ).first()
 
         activo_data = None

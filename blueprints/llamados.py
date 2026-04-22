@@ -1,7 +1,7 @@
 # blueprints/llamados.py
-from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, abort
+from flask import Blueprint, render_template, request, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from models import db, Llamado, LlamadoPaciente, LlamadoEvento, Box, Establecimiento
 from utils import obtener_hora_chile, registrar_log_sistema, operador_required
@@ -88,8 +88,6 @@ def crear_llamado():
 
     try:
         ahora = obtener_hora_chile()
-        # Expiración por defecto en 15 minutos (ajustable)
-        expiracion = ahora + timedelta(minutes=15)
         
         # 1. Crear Cabecera
         nuevo_llamado = Llamado(
@@ -99,8 +97,7 @@ def crear_llamado():
             estado='ACTIVO',
             usuario_creador_id=current_user.id,
             fecha_creacion=ahora,
-            fecha_actualizacion=ahora,
-            fecha_expiracion=expiracion
+            fecha_actualizacion=ahora
         )
         db.session.add(nuevo_llamado)
         db.session.flush() # Obtiene el ID del llamado sin hacer commit definitivo
@@ -198,7 +195,6 @@ def transicion_llamado(llamado_id, accion):
             llamado.estado = 'FINALIZADO'
             llamado.fecha_cierre = ahora
             llamado.cerrado_por_usuario_id = current_user.id
-            llamado.visible_en_pantalla = False
             tipo_evento = 'CIERRE'
             detalle_evento = "Paciente fue atendido. Llamado cerrado."
             
@@ -206,7 +202,6 @@ def transicion_llamado(llamado_id, accion):
             llamado.estado = 'CANCELADO'
             llamado.fecha_cierre = ahora
             llamado.cerrado_por_usuario_id = current_user.id
-            llamado.visible_en_pantalla = False
             tipo_evento = 'CANCELACION'
             detalle_evento = "El paciente no se presentó. Llamado cancelado."
             
