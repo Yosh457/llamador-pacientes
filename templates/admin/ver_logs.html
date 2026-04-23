@@ -55,6 +55,7 @@
                     <th class="text-left py-3 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Usuario</th>
                     <th class="text-left py-3 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Acción</th>
                     <th class="text-left py-3 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">Detalles</th>
+                    <th class="text-left py-3 px-6 font-bold text-xs text-gray-500 uppercase tracking-wider">IP Origen</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
@@ -74,10 +75,13 @@
                     <td class="py-4 px-6 text-sm text-gray-600">
                         {{ log.detalles }}
                     </td>
+                    <td class="py-4 px-6 text-sm text-gray-600">
+                        {{ log.ip_origen or 'N/A' }}
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="text-center py-10 text-gray-500 bg-gray-50">
+                    <td colspan="5" class="text-center py-10 text-gray-500 bg-gray-50">
                         No hay registros de actividad que coincidan con los filtros.
                     </td>
                 </tr>

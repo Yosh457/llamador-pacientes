@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 
 from models import db, Llamado, LlamadoPaciente, LlamadoEvento, Box, Establecimiento
-from utils import obtener_hora_chile, registrar_log_sistema, operador_required
+from utils import obtener_hora_chile, registrar_log_sistema, operador_required, obtener_ip_cliente
 
 llamados_bp = Blueprint('llamados', __name__, template_folder='../templates', url_prefix='/llamados')
 
@@ -88,6 +88,7 @@ def crear_llamado():
 
     try:
         ahora = obtener_hora_chile()
+        ip_actual = obtener_ip_cliente()
         
         # 1. Crear Cabecera
         nuevo_llamado = Llamado(
@@ -123,7 +124,8 @@ def crear_llamado():
             usuario_nombre=current_user.nombre_completo,
             fecha_evento=ahora,
             pacientes_snapshot=snapshot,
-            detalle="Paciente registrado en el sistema."
+            detalle="Paciente registrado en el sistema.",
+            ip_origen=ip_actual
         )
         db.session.add(evento_creacion)
         
@@ -137,7 +139,8 @@ def crear_llamado():
             usuario_nombre=current_user.nombre_completo,
             fecha_evento=ahora,
             pacientes_snapshot=snapshot,
-            detalle="Operador inició el primer llamado."
+            detalle="Operador inició el primer llamado.",
+            ip_origen=ip_actual
         )
         db.session.add(evento_primer)
         
@@ -171,6 +174,7 @@ def transicion_llamado(llamado_id, accion):
     
     # Lógica de transición
     try:
+        ip_actual = obtener_ip_cliente()
         tipo_evento = None
         detalle_evento = ""
         
@@ -221,7 +225,8 @@ def transicion_llamado(llamado_id, accion):
             usuario_nombre=current_user.nombre_completo,
             fecha_evento=ahora,
             pacientes_snapshot=snapshot,
-            detalle=detalle_evento
+            detalle=detalle_evento,
+            ip_origen=ip_actual
         )
         db.session.add(evento)
         db.session.commit()

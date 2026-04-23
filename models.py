@@ -142,7 +142,6 @@ class Pantalla(db.Model):
     token_acceso = db.Column(db.String(128), unique=True, nullable=False)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_chile, nullable=False)
-    ultima_conexion = db.Column(db.DateTime, nullable=True)
 
     establecimiento = db.relationship('Establecimiento', back_populates='pantalla')
 
@@ -180,8 +179,6 @@ class Llamado(db.Model):
 
     cerrado_por_usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='SET NULL'), nullable=True)
     fecha_cierre = db.Column(db.DateTime, nullable=True)
-
-    observacion = db.Column(db.Text, nullable=True)
 
     establecimiento = db.relationship('Establecimiento', back_populates='llamados')
     box = db.relationship('Box', back_populates='llamados')
