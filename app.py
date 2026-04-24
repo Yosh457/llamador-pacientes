@@ -5,9 +5,10 @@ from flask import Flask, redirect, url_for, flash, render_template
 from flask_wtf.csrf import CSRFError
 
 # Importamos extensiones y modelos
-from extensions import login_manager, csrf
+from extensions import login_manager, csrf, socketio
 from models import db, Usuario
 
+# Función de fábrica para crear la aplicación Flask
 def create_app():
     # Inicializa Flask
     app = Flask(__name__)
@@ -51,6 +52,13 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+    
+    # Inicializar SocketIO con la aplicación Flask
+    socketio.init_app(app)
+    
+    # Registrar eventos WebSocket
+    from utils.sockets import register_socket_events
+    register_socket_events(socketio)
 
     # -------------------------------------------------------------------------
     # CONFIGURACIÓN DE LOGIN MANAGER
@@ -131,4 +139,8 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"❌ Error al conectar con BD: {e}")
 
-    app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1")
+    socketio.run(
+        app,
+        debug=os.getenv("FLASK_DEBUG", "0") == "1",
+        allow_unsafe_werkzeug=True  # Necesario para desarrollo con WebSockets
+    )

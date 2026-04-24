@@ -55,6 +55,7 @@
 </style>
 
 <meta name="pantalla-token" content="{{ pantalla.token_acceso }}">
+<meta name="establecimiento-id" content="{{ pantalla.establecimiento_id }}">
 
 <div id="start-overlay">
     <h2>SALA DE ESPERA</h2>
@@ -88,5 +89,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/pantalla_publica.js') }}"></script>
 {% endblock %}

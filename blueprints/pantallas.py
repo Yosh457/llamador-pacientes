@@ -13,8 +13,8 @@ def sala_espera(token):
     pantalla = Pantalla.query.filter_by(token_acceso=token, activo=True).first_or_404()
     return render_template('pantallas/sala_espera.html', pantalla=pantalla)
 
-@pantallas_bp.route('/api/estado/<token>')
-def api_estado(token):
+#@pantallas_bp.route('/api/estado/<token>')
+#def api_estado(token):
     """
     Endpoint JSON consumido vía AJAX Polling.
     Utiliza Event Sourcing para la cola de audio y para el historial visual en cascada.

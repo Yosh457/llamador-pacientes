@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyList = document.getElementById('history-list');
 
     // ==========================================
-    // TOKEN DE ACCESO (SEGURIDAD)
+    // TOKEN DE ACCESO (SEGURIDAD Y SALAS)
     // ==========================================
     // Este token se utiliza para asegurar que solo pantallas autorizadas consulten la API
     const tokenMeta = document.querySelector('meta[name="pantalla-token"]');
@@ -19,16 +19,21 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Token de acceso no encontrado en el meta tag.");
         return;
     }
-    const token = tokenMeta.content;
+
+    // Extraemos el ID del establecimiento para unirnos a la Sala de WebSockets
+    const estMeta = document.querySelector('meta[name="establecimiento-id"]');
+    const establecimientoId = estMeta ? estMeta.content : null;
 
     // ==========================================
-    // VARIABLES DE ESTADO
+    // VARIABLES DE ESTADO Y COLA FIFO
     // ==========================================
     
     // 🔹 Cola FIFO de eventos (SOLUCIONA concurrencia y pérdida de llamados)
     let announcementQueue = [];
     let isAnnouncing = false;
-    let lastEventId = null; // Puntero de sincronización para evitar procesar eventos antiguos
+
+    // 🔹 Control de duplicados de eventos (protección ante reconexiones)
+    let procesadosIds = new Set();
 
     // 🔹 Control de la Pantalla Principal (Para limpiar al cerrar)
     let currentCallIdOnScreen = null; // ID del Llamado (para saber cuándo cerrarlo)
@@ -36,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let nombreEstablecimientoGlobal = "";
 
     // 🔹 Almacenamiento del historial crudo de la BD
-    let lastBackendHistory = [];
+    let lastBackendHistory = []; // Se actualiza vía WebSockets
 
     // 🔹 Audio
     let audioInitialized = false;
@@ -46,6 +51,67 @@ document.addEventListener('DOMContentLoaded', () => {
     // 🔹 Variables Hash para evitar el parpadeo del HTML. 
     let currentActiveHash = "";
     let currentHistoryHash = "";
+
+    // ==========================================
+    // WEBSOCKETS (TIEMPO REAL)
+    // ==========================================
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log("[WS] 🟢 Conectado al servidor WebSocket.");
+        // Unirse a la sala específica de este establecimiento
+        if (establecimientoId) {
+            socket.emit('unirse_sala_espera', { establecimiento_id: establecimientoId });
+        } else {
+            console.warn("[WS] ⚠️ Falta meta tag 'establecimiento-id'.");
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log("[WS] 🔴 Desconectado del servidor WebSocket.");
+    });
+
+    // Recepción del estado inicial al conectar (historial + llamado activo)
+    socket.on('estado_inicial', (data) => {
+        console.log("[WS] 📸 Estado inicial recibido:", data);
+        nombreEstablecimientoGlobal = data.establecimiento;
+        lastBackendHistory = data.historial || [];
+
+        if (data.activo) {
+            procesadosIds.add(data.activo.id);
+            currentCallIdOnScreen = data.activo.llamado_id;
+            currentEventIdOnScreen = data.activo.id;
+            updateMainScreen(data.activo);
+        } else {
+            showEmptyState();
+        }
+
+        updateHistoryUI();
+    });
+
+    // Recepción de eventos en vivo
+    socket.on('nuevo_evento_llamado', (evento) => {
+        console.log("[WS] ⚡ Evento recibido en tiempo real:", evento.tipo_evento, evento);
+        
+        // Evitamos duplicados (Si el socket llega antes que el polling, lo procesamos)
+        if (!procesadosIds.has(evento.id)) {
+            procesadosIds.add(evento.id);
+
+            // Mantener el historial local actualizado
+            if (['PRIMER_LLAMADO', 'SEGUNDO_LLAMADO', 'TERCER_LLAMADO'].includes(evento.tipo_evento)) {
+                lastBackendHistory.unshift({
+                    id: evento.id,
+                    box: evento.box,
+                    timestamp: evento.timestamp,
+                    pacientes: evento.pacientes
+                });
+                if (lastBackendHistory.length > 5) lastBackendHistory.pop();
+            }
+
+            announcementQueue.push(evento);
+            processQueue();
+        }
+    });
 
     // ==========================================
     // INICIALIZACIÓN DE AUDIO (REQUIERE INTERACCIÓN DEL USUARIO)
@@ -69,11 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.style.display = 'none';
         container.classList.add('ready');
         audioInitialized = true;
-
-        // Iniciar el ciclo de consultas (AJAX Polling) inmediatamente
-        pollData();
-        // Configurar la consulta repetitiva cada 3000 ms (3 segundos)
-        setInterval(pollData, 3000);
     }
 
     // El evento 'click' en el overlay inicializa todo el sistema multimedia y comienza el ciclo de consultas a la API.
@@ -106,60 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
-    // AJAX POLLING (EVENT SOURCING)
-    // ==========================================
-    async function pollData() {
-        try {
-            // Construir URL de la API con token de acceso
-            let url = `/pantallas/api/estado/${token}`;
-            // Enviar último ID para traer solo eventos nuevos
-            if (lastEventId !== null) url += `?last_id=${lastEventId}`;
-
-            const response = await fetch(url);
-            if (!response.ok) throw new Error("Error de red o token inválido");
-
-            const data = await response.json();
-            nombreEstablecimientoGlobal = data.establecimiento;
-
-             // 🔹 Manejar el estado en la carga inicial
-            if (lastEventId === null) {
-                if (data.activo) {
-                    currentCallIdOnScreen = data.activo.llamado_id;
-                    currentEventIdOnScreen = data.activo.id;
-                    updateMainScreen(data.activo);
-                } else {
-                    showEmptyState();
-                }
-            }
-            // 🔹 Actualizar puntero de eventos
-            lastEventId = data.last_id;
-            lastBackendHistory = data.historial;
-
-            // 🔹 Encolar eventos nuevos (FIFO)
-            if (data.nuevos_eventos?.length > 0) {
-                announcementQueue.push(...data.nuevos_eventos);
-            }
-
-            // 🔹 Actualizar historial visual independientemente de la cola
-            updateHistoryUI();
-
-            // 🔹 Procesar cola de anuncios
-            processQueue();
-
-        } catch (error) {
-            console.error("Error polling pantalla pública:", error);
-        }
-    }
-
-    // ==========================================
-    // MOTOR FIFO (CLAVE DEL SISTEMA)
+    // MOTOR FIFO (PROCESAMIENTO DE EVENTOS)
     // ==========================================
     function processQueue() {
         // Si ya está hablando o no hay eventos, salir
         if (isAnnouncing || announcementQueue.length === 0) return;
 
         isAnnouncing = true;
-
         const evento = announcementQueue.shift(); // Extraer el primer evento de la fila
 
         // 🛡️ DEFENSIVO: Validar que el evento tenga tipo

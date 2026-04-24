@@ -6,6 +6,10 @@ from datetime import datetime
 from models import db, Llamado, LlamadoPaciente, LlamadoEvento, Box, Establecimiento
 from utils import obtener_hora_chile, registrar_log_sistema, operador_required, obtener_ip_cliente
 
+# Importamos el socketio para emitir eventos en tiempo real
+from extensions import socketio
+from utils.sockets import get_room_name
+
 llamados_bp = Blueprint('llamados', __name__, template_folder='../templates', url_prefix='/llamados')
 
 # --- RUTAS DE NAVEGACIÓN ---
@@ -147,6 +151,26 @@ def crear_llamado():
         db.session.commit()
         flash("Primer llamado realizado con éxito.", "success")
         
+        # =========================================================
+        # EMISIÓN WEBSOCKET (TIEMPO REAL)
+        # =========================================================
+        try:
+            # Emitimos el evento a la sala específica del establecimiento
+            room = get_room_name(establecimiento_id)
+            payload = {
+                "id": evento_primer.id,
+                "llamado_id": nuevo_llamado.id,
+                "tipo_evento": evento_primer.tipo_evento,
+                "box": box_seleccionado.nombre,
+                "timestamp": evento_primer.fecha_evento.isoformat(),
+                "pacientes": snapshot
+            }
+            # 'nuevo_evento_llamado' será el nombre del evento que escuchará la TV
+            socketio.emit('nuevo_evento_llamado', payload, to=room)
+        except Exception as ws_e:
+            print(f"[Socket Error] No se pudo emitir PRIMER_LLAMADO: {str(ws_e)}")
+        # =========================================================
+        
     except Exception as e:
         db.session.rollback()
         flash(f"Error interno al crear el llamado: {str(e)}", "danger")
@@ -233,6 +257,24 @@ def transicion_llamado(llamado_id, accion):
         
         mensaje = f"Acción '{accion.capitalize()}' registrada correctamente."
         flash(mensaje, "success")
+        
+        # =========================================================
+        # EMISIÓN WEBSOCKET (FASE HÍBRIDA)
+        # =========================================================
+        try:
+            room = get_room_name(llamado.establecimiento_id)
+            payload = {
+                "id": evento.id,
+                "llamado_id": llamado.id,
+                "tipo_evento": evento.tipo_evento,
+                "box": llamado.box.nombre if llamado.box else "Sin Box",
+                "timestamp": evento.fecha_evento.isoformat(),
+                "pacientes": snapshot
+            }
+            socketio.emit('nuevo_evento_llamado', payload, to=room)
+        except Exception as ws_e:
+            print(f"[Socket Error] No se pudo emitir transición {accion}: {str(ws_e)}")
+        # =========================================================
         
     except Exception as e:
         db.session.rollback()
