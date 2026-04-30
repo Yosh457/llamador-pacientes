@@ -10,15 +10,21 @@
             <h2 class="text-2xl font-bold text-gray-800">Historial Operativo</h2>
             <p class="text-gray-500 text-sm">Consulta de llamados registrados en el sistema.</p>
         </div>
-        <div class="flex gap-2">
-            {% if current_user.rol.nombre == 'Operador' %}
-            <a href="{{ url_for('llamados.formulario') }}" class="btn btn-secondary">
-                &larr; Volver al Llamador
-            </a>
+            <div class="flex gap-2">
+            {# RETORNO INTELIGENTE SEGÚN ROL #}
+            {% if current_user.rol.nombre == 'Supervisor' %}
+                <a href="{{ url_for('reportes.dashboard') }}" class="btn btn-secondary">
+                    &larr; Volver al Dashboard
+                </a>
+            {% elif current_user.rol.nombre == 'Operador' %}
+                <a href="{{ url_for('llamados.formulario') }}" class="btn btn-secondary">
+                    &larr; Volver al Formulario
+                </a>
             {% else %}
-            <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">
-                &larr; Volver al Panel
-            </a>
+                {# Para Admins #}
+                <a href="{{ url_for('admin.panel') }}" class="btn btn-secondary">
+                    &larr; Volver al Panel
+                </a>
             {% endif %}
         </div>
     </div>

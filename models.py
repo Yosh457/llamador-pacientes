@@ -206,7 +206,6 @@ class LlamadoPaciente(db.Model):
         nullable=False
     )
     paciente_nombre = db.Column(db.String(255), nullable=False)
-    paciente_nombre_normalizado = db.Column(db.String(255), nullable=True)
     orden_visualizacion = db.Column(db.Integer, default=1, nullable=False)
 
     llamado = db.relationship('Llamado', back_populates='pacientes')
@@ -214,7 +213,6 @@ class LlamadoPaciente(db.Model):
     __table_args__ = (
         db.Index('idx_llamado_pacientes_llamado', 'llamado_id'),
         db.Index('idx_llamado_pacientes_nombre', 'paciente_nombre'),
-        db.Index('idx_llamado_pacientes_nombre_normalizado', 'paciente_nombre_normalizado'),
         db.Index('idx_llamado_pacientes_llamado_orden', 'llamado_id', 'orden_visualizacion'),
     )
 
