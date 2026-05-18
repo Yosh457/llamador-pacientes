@@ -146,19 +146,50 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadVoice() {
         const setVoices = () => {
             const voices = speechSynthesis.getVoices();
-            if (voices.length > 0) {
-                // Array de prioridad: Buscar primero acento chileno, luego mexicano, etc.
-                const priorities = ['es-CL', 'es-MX', 'es-US', 'es-ES', 'es-AR'];
-                for (const lang of priorities) {
-                    selectedVoice = voices.find(v => v.lang === lang);
-                    if (selectedVoice) break; // Detener búsqueda si encontramos una coincidencia
-                }
-                // Fallback de seguridad: cualquier voz en español
-                if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('es-'));
+
+            if (!voices.length) {
+                console.warn("[TTS] No se encontraron voces en el sistema.");
+                return;
+            }
+
+            // 1. Prioridad: Voces Femeninas de LATAM (México prioritario)
+            const preferredLatamVoices = ['Paulina', 'Mia', 'Sabina'];
+            selectedVoice = voices.find(v => 
+                v.lang.toLowerCase().includes('mx') && 
+                preferredLatamVoices.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+            );
+
+            // 2. Fallback 1: Si no hay mujeres de LATAM, cualquier voz femenina en español
+            if (!selectedVoice) {
+                const femaleVoices = ['Helena', 'Laura', 'Monica', 'Paulina', 'Sabina'];
+                selectedVoice = voices.find(v => 
+                    v.lang.toLowerCase().startsWith('es') &&
+                    femaleVoices.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+                );
+            }
+
+            // 3. Fallback 2: Las voces nativas de Google (si están usando Chrome)
+            if (!selectedVoice) {
+                selectedVoice = voices.find(v => v.name.toLowerCase().includes('google español'));
+            }
+
+            // 4. Fallback 3: Cualquier voz en español mexicano (es-MX) - ¡Aunque sea Raúl!
+            if (!selectedVoice) {
+                selectedVoice = voices.find(v => v.lang.toLowerCase() === 'es-mx');
+            }
+
+            // 5. Fallback Final: Literalmente la primera voz en español que encuentre
+            if (!selectedVoice) {
+                selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith('es'));
+            }
+
+            if (selectedVoice) {
+                console.log(`[TTS] Voz seleccionada: ${selectedVoice.name} (${selectedVoice.lang})`);
+            } else {
+                console.warn("[TTS] Advertencia: No se pudo seleccionar una voz en español.");
             }
         };
 
-        // Ejecutar inmediatamente si las voces ya cargaron, sino, esperar al evento.
         if (speechSynthesis.getVoices().length > 0) {
             setVoices();
         } else {
@@ -381,11 +412,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const phrase = `${callTexts[evento.tipo_evento] || 'Llamado para'} ${names}. Diríjase a ${boxStr}.`;
 
         const utterance = new SpeechSynthesisUtterance(phrase);
-        utterance.lang = 'es-CL';
-        utterance.rate = 0.85; // Disminuimos la velocidad al 85% para mayor claridad en salas bulliciosas
+        utterance.rate = 0.85; // Disminuimos la velocidad al 85% para mayor claridad
 
-        // Si encontramos una voz preferida en loadVoice(), se la asignamos
-        if (selectedVoice) utterance.voice = selectedVoice;
+        // Asignamos la voz y respetamos su idioma nativo para evitar fallos en el navegador
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            utterance.lang = selectedVoice.lang;
+        } else {
+            utterance.lang = 'es-MX'; // Fallback a México si no detectó ninguna voz
+        }
 
         // Definimos el callback para cuando termine de hablar
         utterance.onend = () => onComplete();
