@@ -133,7 +133,7 @@ def api_metricas():
             llamados_con_espera += 1
 
             # Atención = Primer Llamado -> Cierre Exitoso
-            if t_cierre and ll.estado == 'FINALIZADO':
+            if t_cierre and ll.estado == 'ATENDIDO':
                 atencion = (t_cierre - t_primer_llamado).total_seconds() / 60.0
                 tiempo_atencion_total += atencion
                 llamados_con_atencion += 1
@@ -220,7 +220,7 @@ def export_excel():
     headers = [
         "ID", "Fecha Creación", "Establecimiento", "Box", "Pacientes", 
         "Estado", "T. Espera (min)", "T. Atención (min)", "Re-llamados", 
-        "Creado Por", "Cerrado Por", "Fecha Cierre"
+        "Iniciado Por", "Finalizado Por", "Fecha Cierre"
     ]
     ws.append(headers)
 
@@ -262,7 +262,7 @@ def export_excel():
 
         if t_primer_llamado:
             espera_min = round((t_primer_llamado - ll.fecha_creacion).total_seconds() / 60.0, 1)
-            if ll.fecha_cierre and ll.estado == 'FINALIZADO':
+            if ll.fecha_cierre and ll.estado == 'ATENDIDO':
                 atencion_min = round((ll.fecha_cierre - t_primer_llamado).total_seconds() / 60.0, 1)
 
         # MEJORA: Insertar Fechas nativas

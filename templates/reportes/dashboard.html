@@ -235,10 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Actualizar toda la vista con los datos JSON
     function actualizarUI(data) {
         const total = data.totales.general;
-        const atendidos = data.totales.por_estado['FINALIZADO'] || 0;
+        const atendidos = data.totales.por_estado['ATENDIDO'] || 0;
         
         // MEJORA 2: Separación lógica, pero agrupados visualmente bajo "Ausentes"
-        const cancelados = data.totales.por_estado['CANCELADO'] || 0;
+        const cancelados = data.totales.por_estado['NSP'] || 0;
         const ausentes = cancelados;
 
         // MEJORA 5: KPIs Porcentuales
@@ -272,12 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Preparar data
         const labels = [
             'Atendidos',
-            'Cancelados',
+            'No se presentaron',
             'En Curso'
         ];
         const values = [
-            datosEstado['FINALIZADO'] || 0,
-            datosEstado['CANCELADO'] || 0,
+            datosEstado['ATENDIDO'] || 0,
+            datosEstado['NSP'] || 0,
             datosEstado['ACTIVO'] || 0
         ];
         

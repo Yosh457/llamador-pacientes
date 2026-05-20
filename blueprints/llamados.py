@@ -143,7 +143,7 @@ def crear_llamado():
             usuario_nombre=current_user.nombre_completo,
             fecha_evento=ahora,
             pacientes_snapshot=snapshot,
-            detalle="Operador inició el primer llamado.",
+            detalle="Operador realizó el primer llamado.",
             ip_origen=ip_actual
         )
         db.session.add(evento_primer)
@@ -220,18 +220,18 @@ def transicion_llamado(llamado_id, accion):
             detalle_evento = "Operador realizó el tercer y último llamado."
             
         elif accion == 'cerrar':
-            llamado.estado = 'FINALIZADO'
+            llamado.estado = 'ATENDIDO'  # Cambiado de 'FINALIZADO' a 'ATENDIDO' para mayor claridad
             llamado.fecha_cierre = ahora
             llamado.cerrado_por_usuario_id = current_user.id
-            tipo_evento = 'CIERRE'
-            detalle_evento = "Paciente fue atendido. Llamado cerrado."
+            tipo_evento = 'ATENDIDO'  # Cambiado de 'CIERRE' a 'ATENDIDO' para reflejar el nuevo estado
+            detalle_evento = "Paciente fue atendido"
             
         elif accion == 'cancelar':
-            llamado.estado = 'CANCELADO'
+            llamado.estado = 'NSP'  # Cambiado de 'CANCELADO' a 'NSP' para mayor claridad
             llamado.fecha_cierre = ahora
             llamado.cerrado_por_usuario_id = current_user.id
-            tipo_evento = 'CANCELACION'
-            detalle_evento = "El paciente no se presentó. Llamado cancelado."
+            tipo_evento = 'NSP'  # Cambiado de 'CANCELACION' a 'NSP' para reflejar el nuevo estado
+            detalle_evento = "Paciente no se presentó."
             
         else:
             flash("Transición no válida para el estado actual del llamado.", "warning")

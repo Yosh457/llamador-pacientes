@@ -54,8 +54,8 @@
             <select name="estado" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm text-gray-700">
                 <option value="">Todos los estados</option>
                 <option value="ACTIVO" {% if filtros.estado == 'ACTIVO' %}selected{% endif %}>Activo</option>
-                <option value="FINALIZADO" {% if filtros.estado == 'FINALIZADO' %}selected{% endif %}>Finalizado (Atendido)</option>
-                <option value="CANCELADO" {% if filtros.estado == 'CANCELADO' %}selected{% endif %}>Cancelado (No se presentó)</option>
+                <option value="ATENDIDO" {% if filtros.estado == 'ATENDIDO' %}selected{% endif %}>Atendido</option>
+                <option value="NSP" {% if filtros.estado == 'NSP' %}selected{% endif %}>No se presentó</option>
             </select>
         </div>
 
@@ -100,10 +100,17 @@
                         </td>
                         <td class="py-4 px-6 text-center">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold 
-                                {% if llamado.estado == 'FINALIZADO' %} bg-green-100 text-green-800
-                                {% elif llamado.estado == 'CANCELADO' %} bg-gray-100 text-gray-800
+                                {% if llamado.estado == 'ATENDIDO' %} bg-green-100 text-green-800
+                                {% elif llamado.estado == 'NSP' %} bg-gray-100 text-gray-800
                                 {% else %} bg-blue-100 text-blue-800 {% endif %}">
-                                {{ llamado.estado }}
+                                
+                                {% if llamado.estado == 'ATENDIDO' %}
+                                    ATENDIDO
+                                {% elif llamado.estado == 'NSP' %}
+                                    NO SE PRESENTÓ
+                                {% else %}
+                                    {{ llamado.estado }}
+                                {% endif %}
                             </span>
                         </td>
                         <td class="py-4 px-6 text-center">

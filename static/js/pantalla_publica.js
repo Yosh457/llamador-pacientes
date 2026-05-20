@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 🔹 Si el evento es un cierre y corresponde al que está en pantalla, limpiamos la TV.
-        if (['CIERRE', 'CANCELACION'].includes(evento.tipo_evento)) {
+        if (['ATENDIDO', 'NSP'].includes(evento.tipo_evento)) {
             if (evento.llamado_id === currentCallIdOnScreen) {
                 showEmptyState();
             }

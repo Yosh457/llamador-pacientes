@@ -168,7 +168,7 @@ class Llamado(db.Model):
     )
 
     estado = db.Column(
-        db.Enum('ACTIVO', 'FINALIZADO', 'CANCELADO', name='estado_llamado_enum'),
+        db.Enum('ACTIVO', 'ATENDIDO', 'NSP', name='estado_llamado_enum'),
         nullable=False,
         default='ACTIVO'
     )
@@ -234,8 +234,8 @@ class LlamadoEvento(db.Model):
             'PRIMER_LLAMADO',
             'SEGUNDO_LLAMADO',
             'TERCER_LLAMADO',
-            'CIERRE',
-            'CANCELACION',
+            'ATENDIDO',
+            'NSP',
             name='tipo_evento_llamado_enum'
         ),
         nullable=False
