@@ -31,7 +31,7 @@ Sistema web en tiempo real para la **Red de Atención Primaria de Salud Municipa
 - Registro de eventos:
   - Creación
   - Primer / Segundo / Tercer llamado
-  - Cierre / Cancelación
+  - Atendido / No se presentó (NSP)
 - Auditoría con:
   - Usuario
   - Fecha/hora
@@ -53,7 +53,7 @@ Sistema web en tiempo real para la **Red de Atención Primaria de Salud Municipa
 ## ⚠️ Notas Técnicas
 
 - El sistema implementa una **máquina de estados controlada**, evitando transiciones inválidas: 
-  `PRIMER → SEGUNDO → TERCER → (CIERRE / CANCELACIÓN)`
+  `PRIMER → SEGUNDO → TERCER → (ATENDIDO / NSP)`
 - Se garantiza que cada operador tenga **un único llamado activo simultáneamente**.
 - Todas las acciones generan eventos persistentes en la tabla `LlamadoEvento`, siguiendo un enfoque de **event sourcing simplificado**.
 - Los eventos se emiten en tiempo real mediante **Flask-SocketIO**, únicamente después de confirmar la transacción en base de datos (post-commit), garantizando consistencia entre estado y visualización.
