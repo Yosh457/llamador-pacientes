@@ -112,6 +112,7 @@ def logout():
 @auth_bp.route('/cambiar_clave', methods=['GET', 'POST'])
 @login_required
 def cambiar_clave():
+    # Si el usuario ya la cambió, no debería estar aquí, lo sacamos
     if not current_user.cambio_clave_requerido:
         return redirect(obtener_ruta_redireccion(current_user))
         
@@ -144,6 +145,7 @@ def solicitar_reseteo():
         if usuario:
             token = secrets.token_hex(16)
             cl_tz = pytz.timezone('America/Santiago')
+            # Expiración en 1 hora
             expiracion = datetime.now(cl_tz).replace(tzinfo=None) + timedelta(hours=1)
             
             usuario.reset_token = token

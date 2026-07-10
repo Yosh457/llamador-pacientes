@@ -144,6 +144,7 @@ def crear_usuario():
 
 @admin_bp.route('/editar_usuario/<int:id>', methods=['GET', 'POST'])
 def editar_usuario(id):
+    """Permite modificar los datos básicos, perfil y permisos granulares de un usuario."""
     usuario = Usuario.query.get_or_404(id)
     roles = RolAplicacion.query.order_by(RolAplicacion.nombre).all()
     establecimientos = Establecimiento.query.filter_by(activo=True).order_by(Establecimiento.nombre).all()
@@ -210,6 +211,10 @@ def editar_usuario(id):
 
 @admin_bp.route('/toggle_activo/<int:id>', methods=['POST'])
 def toggle_activo(id):
+    """
+    Habilita o deshabilita a un usuario. 
+    Protege al usuario actual de desactivarse a sí mismo.
+    """
     usuario = Usuario.query.get_or_404(id)
 
     if usuario.id == current_user.id:
@@ -244,7 +249,7 @@ def toggle_activo(id):
 
     return redirect(url_for('admin.panel'))
 
-# --- VISTAS DE AUDITORÍA (SEPARADAS SEGÚN LA ESTRUCTURA ACORDADA) ---
+# --- VISTAS DE AUDITORÍA ADMINISTRATIVA Y DE SISTEMA ----
 
 @admin_bp.route('/ver_logs')
 def ver_logs():

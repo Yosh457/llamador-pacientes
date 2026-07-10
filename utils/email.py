@@ -32,10 +32,12 @@ def enviar_correo_generico(destinatarios, asunto, cuerpo_html, adjunto_path=None
     remitente = os.getenv("EMAIL_USUARIO")
     contrasena = os.getenv("EMAIL_CONTRASENA")
 
+    # Validación mínima de credenciales
     if not remitente or not contrasena:
         print("ERROR: Faltan credenciales EMAIL_USUARIO / EMAIL_CONTRASENA en .env")
         return False
 
+    # 1) Normalizar inputs a listas
     if destinatarios is None:
         destinatarios = []
     if isinstance(destinatarios, str):
@@ -46,24 +48,31 @@ def enviar_correo_generico(destinatarios, asunto, cuerpo_html, adjunto_path=None
     if isinstance(bcc, str):
         bcc = [bcc]
 
+    # 2) Limpiar vacíos/None y quitar duplicados (orden)
     destinatarios = [d.strip() for d in destinatarios if d and str(d).strip()]
     bcc = [d.strip() for d in bcc if d and str(d).strip()]
 
+    # Deduplicar manteniendo el orden
     destinatarios = list(dict.fromkeys(destinatarios))
     bcc = list(dict.fromkeys(bcc))
 
+    # Si no hay nadie en To ni Bcc, no tiene sentido enviar
     if not destinatarios and not bcc:
         print("ERROR: Faltan destinatarios (To/Bcc).")
         return False
 
+    # 3) Construir el mensaje (headers visibles)
     msg = MIMEMultipart()
     msg["Subject"] = asunto
-    # Actualizado al nuevo nombre del sistema
     msg["From"] = formataddr(("Llamador de Pacientes", remitente))
+    # "To" visible: si no hay destinatarios, ponemos el remitente
+    # (así el correo no queda con To vacío)
     msg["To"] = ", ".join(destinatarios) if destinatarios else remitente
 
+    # Cuerpo HTML
     msg.attach(MIMEText(cuerpo_html, "html"))
 
+    # Adjuntar archivo si corresponde
     if adjunto_path and os.path.exists(adjunto_path):
         try:
             with open(adjunto_path, "rb") as f:
@@ -73,6 +82,7 @@ def enviar_correo_generico(destinatarios, asunto, cuerpo_html, adjunto_path=None
         except Exception as e:
             print(f"Error adjuntando archivo: {e}")
 
+    # 4) Enviar: definimos explícitamente el "sobre" (envelope SMTP)
     recipients = []
     if destinatarios:
         recipients.extend(destinatarios)
@@ -82,6 +92,7 @@ def enviar_correo_generico(destinatarios, asunto, cuerpo_html, adjunto_path=None
     if bcc:
         recipients.extend(bcc)
 
+    # Deduplicar recipients por si se repiten
     recipients = list(dict.fromkeys([r for r in recipients if r]))
 
     try:

@@ -22,7 +22,6 @@ class RolAplicacion(db.Model):
 
     usuarios = db.relationship('Usuario', back_populates='rol')
 
-
 class TipoEstablecimiento(db.Model):
     __tablename__ = 'tipos_establecimiento'
     id = db.Column(db.Integer, primary_key=True)
@@ -30,7 +29,6 @@ class TipoEstablecimiento(db.Model):
     activo = db.Column(db.Boolean, default=True, nullable=False)
 
     establecimientos = db.relationship('Establecimiento', back_populates='tipo_establecimiento')
-
 
 class Establecimiento(db.Model):
     __tablename__ = 'establecimientos'
@@ -56,7 +54,6 @@ class Establecimiento(db.Model):
         uselist=False, 
         cascade='all, delete-orphan'
     )
-
 
 # ==============================================================================
 # USUARIOS
@@ -102,7 +99,6 @@ class Usuario(db.Model, UserMixin):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-
 # ==============================================================================
 # BOXES Y PANTALLAS
 # ==============================================================================
@@ -129,7 +125,6 @@ class Box(db.Model):
         db.Index('idx_boxes_establecimiento_activo_orden', 'establecimiento_id', 'activo', 'orden'),
     )
 
-
 class Pantalla(db.Model):
     __tablename__ = 'pantallas'
     id = db.Column(db.Integer, primary_key=True)
@@ -149,7 +144,6 @@ class Pantalla(db.Model):
         db.UniqueConstraint('establecimiento_id', name='uk_pantallas_establecimiento'),
         db.Index('idx_pantallas_activo', 'activo'),
     )
-
 
 # ==============================================================================
 # LLAMADOS
@@ -196,7 +190,6 @@ class Llamado(db.Model):
         db.Index('idx_llamados_estado_fecha', 'estado', 'fecha_creacion'),
     )
 
-
 class LlamadoPaciente(db.Model):
     __tablename__ = 'llamado_pacientes'
     id = db.Column(db.BigInteger, primary_key=True)
@@ -215,7 +208,6 @@ class LlamadoPaciente(db.Model):
         db.Index('idx_llamado_pacientes_nombre', 'paciente_nombre'),
         db.Index('idx_llamado_pacientes_llamado_orden', 'llamado_id', 'orden_visualizacion'),
     )
-
 
 class LlamadoEvento(db.Model):
     __tablename__ = 'llamado_eventos'
@@ -262,7 +254,6 @@ class LlamadoEvento(db.Model):
         db.Index('idx_llamado_eventos_tipo_fecha', 'tipo_evento', 'fecha_evento'),
         db.Index('idx_llamado_eventos_box_fecha', 'box_id', 'fecha_evento'),
     )
-
 
 # ==============================================================================
 # LOGS DEL SISTEMA
